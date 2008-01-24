@@ -207,17 +207,20 @@
         </div>
       
         <div class="method-description">
-          <p>
-DROP FUNCTION name ( [ type [, &#8230;] ] ) [ CASCADE | RESTRICT ]
+          <pre>
+ DROP FUNCTION name ( [ type [, ...] ] ) [ CASCADE | RESTRICT ]
+</pre>
+<p>
+default RESTRICT
 </p>
           <p><a class="source-toggle" href="#"
             onclick="toggleCode('M000009-source');return false;">[Source]</a></p>
           <div class="method-source-code" id="M000009-source">
 <pre>
-     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 201</span>
-201:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">drop_proc</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={})
-202:         <span class="ruby-identifier">execute</span> <span class="ruby-node">&quot;DROP FUNCTION \&quot;#{name}\&quot;(#{columns.collect {|column| quote_column_name(column)}.join(&quot;, &quot;)}) #{options[:deep] || 'RESTRICT'};&quot;</span>
-203:       <span class="ruby-keyword kw">end</span>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 202</span>
+202:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">drop_proc</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={})
+203:         <span class="ruby-identifier">execute</span> <span class="ruby-node">&quot;DROP FUNCTION \&quot;#{name}\&quot;(#{columns.collect {|column| column}.join(&quot;, &quot;)}) #{options[:deep] || 'RESTRICT'};&quot;</span>
+204:       <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
@@ -366,54 +369,55 @@ DROP TRIGGER name ON table [ CASCADE | RESTRICT ]
         </div>
       
         <div class="method-description">
-          <p>
-CREATE [ OR REPLACE ] FUNCTION
-</p>
-<pre>
-    name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
-    [ RETURNS rettype ]
-  { LANGUAGE langname
-    | IMMUTABLE | STABLE | VOLATILE
-    | CALLED ON NULL INPUT | RETURNS NULL ON NULL INPUT | STRICT
-   | [ EXTERNAL ] SECURITY INVOKER | [ EXTERNAL ] SECURITY DEFINER
-    | AS 'definition'
-   | AS 'obj_file', 'link_symbol'
- } ...
-   [ WITH ( isStrict &amp;| isCacheable ) ]
+          <pre>
+      From PostgreSQL
+      CREATE [ OR REPLACE ] FUNCTION
+          name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
+          [ RETURNS rettype ]
+        { LANGUAGE langname
+          | IMMUTABLE | STABLE | VOLATILE
+          | CALLED ON NULL INPUT | RETURNS NULL ON NULL INPUT | STRICT
+         | [ EXTERNAL ] SECURITY INVOKER | [ EXTERNAL ] SECURITY DEFINER
+          | AS 'definition'
+         | AS 'obj_file', 'link_symbol'
+       } ...
+         [ WITH ( isStrict &amp;| isCacheable ) ]
 </pre>
+<p>
+TODO Implement [ [ argmode ] [ argname ] argtype ]
+</p>
           <p><a class="source-toggle" href="#"
             onclick="toggleCode('M000011-source');return false;">[Source]</a></p>
           <div class="method-source-code" id="M000011-source">
 <pre>
-     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 227</span>
-227:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_proc_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={}, <span class="ruby-operator">&amp;</span><span class="ruby-identifier">block</span>)
-228:           <span class="ruby-comment cmt"># TODO</span>
-229:           <span class="ruby-comment cmt"># [ [ argmode ] [ argname ] argtype ]</span>
-230:           <span class="ruby-identifier">returns</span> = <span class="ruby-value str">''</span>
-231:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>.<span class="ruby-identifier">has_key?</span>(<span class="ruby-identifier">:return</span>)
-232:             <span class="ruby-identifier">returns</span> = <span class="ruby-node">&quot;RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}&quot;</span>
-233:           <span class="ruby-keyword kw">end</span>
-234:           <span class="ruby-identifier">lang</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:lang</span>] <span class="ruby-operator">||</span> <span class="ruby-value str">&quot;plpgsql&quot;</span>
-235: 
-236:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">block_given?</span>
-237:             <span class="ruby-identifier">body</span> = <span class="ruby-node">&quot;$#{Inflector.underscore(name)}_body$
-238: #{yield}
-239: $#{Inflector.underscore(name)}_body$&quot;</span>
-240:           <span class="ruby-keyword kw">elsif</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>]
-241:             <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>] <span class="ruby-operator">+=</span> [<span class="ruby-identifier">name</span>] <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">size</span> <span class="ruby-operator">==</span> <span class="ruby-value">1</span>
-242:             <span class="ruby-identifier">body</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">res</span><span class="ruby-operator">|</span> <span class="ruby-node">&quot;'#{res}'&quot;</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot;, &quot;</span>)
-243:           <span class="ruby-keyword kw">else</span>
-244:             <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span> <span class="ruby-keyword kw">and</span> <span class="ruby-keyword kw">return</span>
-245:           <span class="ruby-keyword kw">end</span>
-246: 
-247:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;CREATE OR REPLACE FUNCTION \&quot;#{name}\&quot;(#{columns.collect{|column| column}.join(&quot;, &quot;)}) #{returns} AS
-248: #{body}
-249: LANGUAGE #{lang}
-250: #{ (options[:behavior] || 'VOLATILE').upcase }
-251: #{ options[:strict] ? 'STRICT' : 'CALLED ON NULL INPUT'}
-252: EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
-253: &quot;</span>
-254:         <span class="ruby-keyword kw">end</span>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 243</span>
+243:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_proc_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={}, <span class="ruby-operator">&amp;</span><span class="ruby-identifier">block</span>)
+244:           <span class="ruby-identifier">returns</span> = <span class="ruby-value str">''</span>
+245:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>.<span class="ruby-identifier">has_key?</span>(<span class="ruby-identifier">:return</span>)
+246:             <span class="ruby-identifier">returns</span> = <span class="ruby-node">&quot;RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}&quot;</span>
+247:           <span class="ruby-keyword kw">end</span>
+248:           <span class="ruby-identifier">lang</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:lang</span>] <span class="ruby-operator">||</span> <span class="ruby-value str">&quot;plpgsql&quot;</span>
+249: 
+250:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">block_given?</span>
+251:             <span class="ruby-identifier">body</span> = <span class="ruby-node">&quot;$#{Inflector.underscore(name)}_body$
+252: #{yield}
+253: $#{Inflector.underscore(name)}_body$&quot;</span>
+254:           <span class="ruby-keyword kw">elsif</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>]
+255:             <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>] <span class="ruby-operator">+=</span> [<span class="ruby-identifier">name</span>] <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">size</span> <span class="ruby-operator">==</span> <span class="ruby-value">1</span>
+256:             <span class="ruby-identifier">body</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">res</span><span class="ruby-operator">|</span> <span class="ruby-node">&quot;'#{res}'&quot;</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot;, &quot;</span>)
+257:           <span class="ruby-keyword kw">else</span>
+258:             <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span> <span class="ruby-keyword kw">and</span> <span class="ruby-keyword kw">return</span>
+259:           <span class="ruby-keyword kw">end</span>
+260: 
+261:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;
+262:                   CREATE OR REPLACE FUNCTION \&quot;#{name}\&quot;(#{columns.collect{|column| column}.join(&quot;, &quot;)}) #{returns} AS
+263:                         #{body}
+264:                         LANGUAGE #{lang}
+265:                         #{ (options[:behavior] || 'VOLATILE').upcase }
+266:                         #{ options[:strict] ? 'STRICT' : 'CALLED ON NULL INPUT'}
+267:                         EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
+268:                   &quot;</span>
+269:         <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
@@ -437,13 +441,13 @@ FOR [ EACH ] { ROW | STATEMENT } ] EXECUTE PROCEDURE funcname ( arguments )
             onclick="toggleCode('M000010-source');return false;">[Source]</a></p>
           <div class="method-source-code" id="M000010-source">
 <pre>
-     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 209</span>
-209:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_trigger_query</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>={})
-210:           <span class="ruby-identifier">event_str</span> = <span class="ruby-identifier">events</span>.<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">event</span><span class="ruby-operator">|</span> <span class="ruby-identifier">event</span>.<span class="ruby-identifier">to_s</span>.<span class="ruby-identifier">upcase</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot; OR &quot;</span>)
-211:           <span class="ruby-identifier">trigger_name</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:name</span>] <span class="ruby-operator">||</span> <span class="ruby-constant">Inflector</span>.<span class="ruby-identifier">triggerize</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:before</span>])
-212:           <span class="ruby-identifier">func_name</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:function</span>] <span class="ruby-operator">||</span> <span class="ruby-identifier">trigger_name</span>
-213:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;CREATE TRIGGER #{trigger_name} #{(options[:before] ? &quot;BEFORE&quot; : &quot;AFTER&quot;)} #{event_str} ON #{table} FOR EACH #{(options[:row] ? &quot;ROW&quot; : &quot;STATEMENT&quot;)} EXECUTE PROCEDURE #{func_name}();&quot;</span>
-214:         <span class="ruby-keyword kw">end</span>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 210</span>
+210:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_trigger_query</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>={})
+211:           <span class="ruby-identifier">event_str</span> = <span class="ruby-identifier">events</span>.<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">event</span><span class="ruby-operator">|</span> <span class="ruby-identifier">event</span>.<span class="ruby-identifier">to_s</span>.<span class="ruby-identifier">upcase</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot; OR &quot;</span>)
+212:           <span class="ruby-identifier">trigger_name</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:name</span>] <span class="ruby-operator">||</span> <span class="ruby-constant">Inflector</span>.<span class="ruby-identifier">triggerize</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:before</span>])
+213:           <span class="ruby-identifier">func_name</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:function</span>] <span class="ruby-operator">||</span> <span class="ruby-identifier">trigger_name</span>
+214:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;CREATE TRIGGER #{trigger_name} #{(options[:before] ? &quot;BEFORE&quot; : &quot;AFTER&quot;)} #{event_str} ON #{table} FOR EACH #{(options[:row] ? &quot;ROW&quot; : &quot;STATEMENT&quot;)} EXECUTE PROCEDURE #{func_name}();&quot;</span>
+215:         <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
@@ -463,19 +467,19 @@ FOR [ EACH ] { ROW | STATEMENT } ] EXECUTE PROCEDURE funcname ( arguments )
             onclick="toggleCode('M000012-source');return false;">[Source]</a></p>
           <div class="method-source-code" id="M000012-source">
 <pre>
-     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 256</span>
-256:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_type_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-operator">*</span><span class="ruby-identifier">columns</span>)
-257:           <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">columns</span>.<span class="ruby-identifier">empty?</span>
-258:           <span class="ruby-node">&quot;CREATE TYPE #{quote_column_name(name)} AS (
-259:             #{columns.collect{|column,type|
-260:                           if column.is_a?(Hash)
-261:                                 column.collect { |column, type| &quot;#{quote_column_name(column)} #{type}&quot; }
-262:                           else
-263:                           &quot;#{quote_column_name(column)} #{type}&quot;
-264:                           end
-265:             }.join(&quot;,\n&quot;)}
-266:           )&quot;</span>
-267:         <span class="ruby-keyword kw">end</span>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 271</span>
+271:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_type_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-operator">*</span><span class="ruby-identifier">columns</span>)
+272:           <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">columns</span>.<span class="ruby-identifier">empty?</span>
+273:           <span class="ruby-node">&quot;CREATE TYPE #{quote_column_name(name)} AS (
+274:             #{columns.collect{|column,type|
+275:                           if column.is_a?(Hash)
+276:                                 column.collect { |column, type| &quot;#{quote_column_name(column)} #{type}&quot; }
+277:                           else
+278:                           &quot;#{quote_column_name(column)} #{type}&quot;
+279:                           end
+280:             }.join(&quot;,\n&quot;)}
+281:           )&quot;</span>
+282:         <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
