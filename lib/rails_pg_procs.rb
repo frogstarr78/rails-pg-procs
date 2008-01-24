@@ -64,7 +64,7 @@ module ActiveRecord
           stream.print ", :strict => true" if is_strict
           stream.print ", :behavior => '#{volatile}'" unless volatile == 'v'
           stream.print ", :lang => '#{lang}')"
-          stream.print " {\n<<-#{Inflector.underscore(name)}_sql\n#{src.chomp}\n#{Inflector.underscore(name)}_sql\n}" if bin == '-'
+          stream.print " {\n    <<-#{Inflector.underscore(name)}_sql\n#{src.chomp}\n    #{Inflector.underscore(name)}_sql\n  }" if bin == '-'
           stream.print "\n"
         }
       end
@@ -163,8 +163,8 @@ module ActiveRecord
         types
       end
 
-      def create_type(name, columns)
-        execute get_type_query(name, columns)
+      def create_type(name, *columns)
+        execute get_type_query(name, *columns)
       end
       
       def drop_type(name, drop_dependants="RESTRICT")
@@ -250,16 +250,15 @@ EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
 "
         end
 
-        def get_type_query(name, columns)
-          raise StatementInvalid.new if !columns.is_a?(Array) or columns.empty?
+        def get_type_query(name, *columns)
+          raise StatementInvalid.new if columns.empty?
           "CREATE TYPE #{quote_column_name(name)} AS (
-            #{columns.collect{|column, type|
-              if column.is_a?(Hash)
-                column.collect { |column, type| "#{quote_column_name(column.to_s)} #{type}" }
-              else
-              "#{quote_column_name(column.to_s)} #{type}"
-              end
-              
+            #{columns.collect{|column,type|
+			  if column.is_a?(Hash)
+				column.collect { |column, type| "#{quote_column_name(column)} #{type}" }
+			  else
+			  "#{quote_column_name(column)} #{type}"
+			  end
             }.join(",\n")}
           )"
         end

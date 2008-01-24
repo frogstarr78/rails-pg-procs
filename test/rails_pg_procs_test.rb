@@ -69,7 +69,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
   end
 
   def test_functional_dump
-    @connection.create_type(:qualitysmith_user, [[:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"]])
+    @connection.create_type(:qualitysmith_user, [:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"])
     @connection.create_proc("name-with-hyphen", [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:update_trade_materials_statuses_logf, [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:levenshtein, [], :return => :trigger, :resource => ['$libdir/fuzzystrmatch'], :lang => "c")
@@ -150,7 +150,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
     }
 
     # a type test
-    @connection.create_type(:qualitysmith_user, [[:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean]])
+    @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     assert_no_exception(NoMethodError) do 
       dumper = ActiveRecord::SchemaDumper.new(@connection)
       stream = StringIO.new
@@ -160,6 +160,10 @@ class RailsPgProcsTest < Test::Unit::TestCase
        assert_equal '  create_type(:qualitysmith_user, [[:name, "character varying(10)"], [:zip, "numeric(5,0)"], [:is_customer, :boolean]])', received.chomp
     end
     @connection.drop_type(:qualitysmith_user)
+
+#	with_proc(:test_sql_type_proc_with_table_reference, [:integer], :return => nil){
+#	
+#	}
   end
 
   def test_calculations
@@ -172,14 +176,6 @@ class RailsPgProcsTest < Test::Unit::TestCase
   end
 
   def test_create_type()
-    [
-      'CREATE TYPE "user"',
-      '"name" varchar(10)',
-      '"zip" numeric(5,0)'
-    ].each {|re|
-      assert_match re.to_regex, @connection.send("get_type_query", "user", [[:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean]])
-    }
-
     assert_exception(ActiveRecord::StatementInvalid, "Missing columns") {
       @connection.create_type("user", {})
     }
@@ -187,8 +183,16 @@ class RailsPgProcsTest < Test::Unit::TestCase
       @connection.create_type("user", [])
     }
 
+    [
+      'CREATE TYPE "user"',
+      '"name" varchar(10)',
+      '"zip" numeric(5,0)'
+    ].each {|re|
+      assert_match re.to_regex, @connection.send("get_type_query", "user", [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
+    }
+
     assert_nothing_raised {
-      @connection.create_type(:qualitysmith_user, [[:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean]])
+      @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     }
     count = @connection.select_value("select count(*) from pg_type where typname = 'qualitysmith_user'", "count")
     assert_equal("1", count)
