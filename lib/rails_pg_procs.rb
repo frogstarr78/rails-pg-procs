@@ -195,8 +195,9 @@ module ActiveRecord
       end
 
 #      DROP FUNCTION name ( [ type [, ...] ] ) [ CASCADE | RESTRICT ]
+#     default RESTRICT
       def drop_proc(name, columns=[], options={})
-        execute "DROP FUNCTION \"#{name}\"(#{columns.collect {|column| quote_column_name(column)}.join(", ")}) #{options[:deep] || 'RESTRICT'};"
+        execute "DROP FUNCTION \"#{name}\"(#{columns.collect {|column| column}.join(", ")}) #{options[:deep] || 'RESTRICT'};"
       end
 
       private 
@@ -210,6 +211,19 @@ module ActiveRecord
           result = "CREATE TRIGGER #{trigger_name} #{(options[:before] ? "BEFORE" : "AFTER")} #{event_str} ON #{table} FOR EACH #{(options[:row] ? "ROW" : "STATEMENT")} EXECUTE PROCEDURE #{func_name}();"
         end
 
+#       Helper function that builds the sql query used to create a stored procedure.
+#       Mostly this is here so we can unit test the generated sql.
+#       Either an option[:resource] or block must be defined for this method. 
+#       Otherwise an ActiveRecord::StatementInvalid exception is raised.
+#       Defaults are: 
+#          RETURNS (no default -- which is cheap since that means you have to call this method w/ the options Hash) TODO: fix this
+#          LANGUAGE = plpgsql (The plugin will add this if you don't have it added already)
+#          behavior = VOLATILE (Don't specify IMMUTABLE or STABLE and this will be added for you)
+#          strict = CALLED ON NULL INPUT (Otherwise STRICT, According to the 8.0 manual STRICT and RETURNS NULL ON NULL INPUT (RNONI)
+#		     behave the same so I didn't make a case for RNONI)
+#          user = INVOKER
+          
+        
 #       From PostgreSQL
 ##      CREATE [ OR REPLACE ] FUNCTION
 ##          name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
@@ -241,13 +255,14 @@ $#{Inflector.underscore(name)}_body$"
             raise StatementInvalid.new and return
           end
 
-          result = "CREATE OR REPLACE FUNCTION \"#{name}\"(#{columns.collect{|column| column}.join(", ")}) #{returns} AS
-#{body}
-LANGUAGE #{lang}
-#{ (options[:behavior] || 'VOLATILE').upcase }
-#{ options[:strict] ? 'STRICT' : 'CALLED ON NULL INPUT'}
-EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
-"
+          result = "
+		  CREATE OR REPLACE FUNCTION \"#{name}\"(#{columns.collect{|column| column}.join(", ")}) #{returns} AS
+			#{body}
+			LANGUAGE #{lang}
+			#{ (options[:behavior] || 'VOLATILE').upcase }
+			#{ options[:strict] ? 'STRICT' : 'CALLED ON NULL INPUT'}
+			EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
+		  "
         end
 
         def get_type_query(name, *columns)
