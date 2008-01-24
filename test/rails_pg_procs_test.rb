@@ -113,7 +113,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
           stream = StringIO.new
           dumper.send(:procedures, stream)
           stream.rewind
-          assert_match "  create_proc(:insert_after_test_table_trigger, [], :return => :trigger, :lang => 'plpgsql') {\n    <<-insert_after_test_table_trigger_sql\n\n#{@query_body}\n	  insert_after_test_table_trigger_sql\n	}\n".to_regex, stream.read
+          assert_match "  create_proc(:insert_after_test_table_trigger, [], :return => :trigger, :lang => 'plpgsql') {\n    <<-insert_after_test_table_trigger_sql\n\n#{@query_body}\n    insert_after_test_table_trigger_sql\n  }\n".to_regex, stream.read
         end
       }
     }
