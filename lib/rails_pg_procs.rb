@@ -91,9 +91,9 @@ module ActiveRecord
 
       def types(stream)
         @connection.types.each {|type|
-          stream.print "  create_type(#{Inflector.symbolize(type.name)}, ["
+          stream.print "  create_type(#{Inflector.symbolize(type.name)}, "
           stream.print "#{ type.columns.collect{|column, type| "[#{Inflector.symbolize(column)}, #{get_type(type)}]"}.join(", ") }"
-          stream.puts  "])"
+          stream.puts  ")"
         }
       end
 
@@ -210,6 +210,7 @@ module ActiveRecord
           result = "CREATE TRIGGER #{trigger_name} #{(options[:before] ? "BEFORE" : "AFTER")} #{event_str} ON #{table} FOR EACH #{(options[:row] ? "ROW" : "STATEMENT")} EXECUTE PROCEDURE #{func_name}();"
         end
 
+#       From PostgreSQL
 ##      CREATE [ OR REPLACE ] FUNCTION
 ##          name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
 ##          [ RETURNS rettype ]
@@ -221,9 +222,8 @@ module ActiveRecord
 #          | AS 'obj_file', 'link_symbol'
 #        } ...
 #          [ WITH ( isStrict &| isCacheable ) ]
+		# TODO Implement [ [ argmode ] [ argname ] argtype ]
         def get_proc_query(name, columns=[], options={}, &block)
-          # TODO
-          # [ [ argmode ] [ argname ] argtype ]
           returns = ''
           if options.has_key?(:return)
             returns = "RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}"
@@ -241,7 +241,7 @@ $#{Inflector.underscore(name)}_body$"
             raise StatementInvalid.new and return
           end
 
-          result = "CREATE OR REPLACE FUNCTION \"#{name}\"(#{columns.collect{|column| quote_column_name(column)}.join(", ")}) #{returns} AS
+          result = "CREATE OR REPLACE FUNCTION \"#{name}\"(#{columns.collect{|column| column}.join(", ")}) #{returns} AS
 #{body}
 LANGUAGE #{lang}
 #{ (options[:behavior] || 'VOLATILE').upcase }

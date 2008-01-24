@@ -69,6 +69,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
   end
 
   def test_functional_dump
+#    @connection.drop_type(:qualitysmith_user)
     @connection.create_type(:qualitysmith_user, [:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"])
     @connection.create_proc("name-with-hyphen", [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:update_trade_materials_statuses_logf, [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
@@ -81,10 +82,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, stream)
     received_sql = stream.string
 
-    f = File.open("out.rb", "w")
-    f.write received_sql
-    f.close
-    assert_match('create_type(:qualitysmith_user, [[:name, "character varying"], [:address, "character varying(20)"], [:zip, "character varying(5)"], [:phone, "numeric(10,0)"]])'.to_regex, received_sql)
+    assert_match('create_type(:qualitysmith_user, [:name, "character varying"], [:address, "character varying(20)"], [:zip, "character varying(5)"], [:phone, "numeric(10,0)"])'.to_regex, received_sql)
     assert_match("create_proc('name-with-hyphen'".to_regex, received_sql)
     assert_match('create_proc(:update_trade_materials_statuses_logf'.to_regex, received_sql)
     assert_match('create_proc(:levenshtein, []'.to_regex, received_sql)
@@ -150,6 +148,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
     }
 
     # a type test
+#    @connection.drop_type(:qualitysmith_user)
     @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     assert_no_exception(NoMethodError) do 
       dumper = ActiveRecord::SchemaDumper.new(@connection)
@@ -157,13 +156,22 @@ class RailsPgProcsTest < Test::Unit::TestCase
       dumper.send(:types, stream)
       stream.rewind
       received = stream.read
-       assert_equal '  create_type(:qualitysmith_user, [[:name, "character varying(10)"], [:zip, "numeric(5,0)"], [:is_customer, :boolean]])', received.chomp
+       assert_equal '  create_type(:qualitysmith_user, [:name, "character varying(10)"], [:zip, "numeric(5,0)"], [:is_customer, :boolean])', received.chomp
     end
     @connection.drop_type(:qualitysmith_user)
 
-#	with_proc(:test_sql_type_proc_with_table_reference, [:integer], :return => nil){
-#	
-#	}
+#    proc_name, columns = :test_sql_type_proc_with_table_reference, [:integer]
+#    assert_not_equal proc_name, @connection.procedures.result.last[1]
+#    assert_nothing_raised {
+#      @connection.create_proc(proc_name, columns, :return => nil, :lang => :sql) { 
+#        <<-sql
+#          SELECT * FROM a_table_that_doesnt_yet_exist WHERE id = '$1';
+#        sql
+#      }
+#    }
+#    assert_equal proc_name.to_s, @connection.procedures.result.last[1]
+#    @connection.drop_proc(proc_name, columns)
+#    assert_not_equal proc_name.to_s, @connection.procedures.result.last[1]
   end
 
   def test_calculations
