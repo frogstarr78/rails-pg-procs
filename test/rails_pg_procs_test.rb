@@ -36,6 +36,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
 
   def teardown
     @connection.drop_table(:test_table)
+#    @connection.drop_type :qualitysmith_user
   end
 
   def test_constants
@@ -69,32 +70,43 @@ class RailsPgProcsTest < Test::Unit::TestCase
   end
 
   def test_functional_dump
-#    @connection.drop_type(:qualitysmith_user)
+#    @connection.drop_type :qualitysmith_user
     @connection.create_type(:qualitysmith_user, [:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"])
     @connection.create_proc("name-with-hyphen", [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:update_trade_materials_statuses_logf, [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:levenshtein, [], :return => :trigger, :resource => ['$libdir/fuzzystrmatch'], :lang => "c")
     @connection.add_trigger(:test_table, [:insert, :update], :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)
     @connection.add_trigger(:test_table, [:insert, :update], :function => :levenshtein)
+    @connection.create_table(:a_table_defined_after_the_stored_proc, :force => true) {|t|
+      t.column :name, :varchar
+    }
+    @connection.create_proc(:sql_proc_with_table_reference, [:integer], :return => :integer, :lang => "SQL") { "SELECT id FROM a_table_defined_after_the_stored_proc WHERE id = $1;" }
 
     stream = StringIO.new
     ActiveRecord::SchemaDumper.ignore_tables = []
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, stream)
     received_sql = stream.string
 
+    f = File.open("out.rb", "w")
+    f.write received_sql
+    f.close
     assert_match('create_type(:qualitysmith_user, [:name, "character varying"], [:address, "character varying(20)"], [:zip, "character varying(5)"], [:phone, "numeric(10,0)"])'.to_regex, received_sql)
     assert_match("create_proc('name-with-hyphen'".to_regex, received_sql)
     assert_match('create_proc(:update_trade_materials_statuses_logf'.to_regex, received_sql)
     assert_match('create_proc(:levenshtein, []'.to_regex, received_sql)
     assert_match('add_trigger(:test_table, [:insert, :update], :name => :insert_or_update_after_test_table_trigger, :function => :levenshtein)'.to_regex, received_sql)
     assert_match('add_trigger(:test_table, [:insert, :update], :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)'.to_regex, received_sql)
+    assert_match('create_table "a_table_defined_after_the_stored_proc"'.to_regex, received_sql)
+    assert_match("create_proc(:sql_proc_with_table_reference, [:int4], :return => :int4, :lang => 'sql') {\n    <<-sql_proc_with_table_reference_sql\n\nSELECT id FROM a_table_defined_after_the_stored_proc WHERE id = $1;\n    sql_proc_with_table_reference_sql\n  }".to_regex, received_sql.split("\n")[-9..-2].join("\n"))
 
     @connection.remove_trigger(:test_table, :update_trade_materials_statuses_logt)
     @connection.remove_trigger(:test_table, :insert_or_update_after_test_table_trigger)
     @connection.drop_proc(:update_trade_materials_statuses_logf)
     @connection.drop_proc(:levenshtein)
     @connection.drop_proc('name-with-hyphen')
+    @connection.drop_proc(:sql_proc_with_table_reference, [:int4])
     @connection.drop_type(:qualitysmith_user)
+    @connection.drop_table(:a_table_defined_after_the_stored_proc)
   end
 
   def test_schema_dumper
@@ -148,7 +160,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
     }
 
     # a type test
-#    @connection.drop_type(:qualitysmith_user)
+#    @connection.drop_type :qualitysmith_user
     @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     assert_no_exception(NoMethodError) do 
       dumper = ActiveRecord::SchemaDumper.new(@connection)
@@ -160,8 +172,8 @@ class RailsPgProcsTest < Test::Unit::TestCase
     end
     @connection.drop_type(:qualitysmith_user)
 
-    proc_name, columns = :test_sql_type_proc_with_table_reference, [:integer]
-    assert_not_equal proc_name.to_s, @connection.procedures.result.last[1]
+    proc_name, columns = "test_sql_type_proc_with_table_reference", [:integer]
+    assert_not_equal proc_name, @connection.procedures.result.last[1]
     assert_raise ActiveRecord::StatementInvalid do
       @connection.create_proc(proc_name, columns, :return => nil, :lang => :sql) { 
         <<-sql
@@ -169,7 +181,22 @@ class RailsPgProcsTest < Test::Unit::TestCase
         sql
       }
     end
-    assert_not_equal proc_name.to_s, @connection.procedures.result.last[1]
+    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    @connection.create_table(:a_table_that_doesnt_yet_exist, :force => true) { |t|
+      t.column :name, :varchar
+    }
+
+    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    assert_nothing_raised do
+      @connection.create_proc(proc_name, columns, :return => :integer, :lang => :sql, :force => true) { 
+        <<-sql
+          SELECT id FROM a_table_that_doesnt_yet_exist WHERE id = $1;
+        sql
+      }
+    end
+    @connection.drop_table(:a_table_that_doesnt_yet_exist)
+    @connection.drop_proc(proc_name, columns)
+    assert_not_equal proc_name, @connection.procedures.result.last[1]
   end
 
   def test_calculations
@@ -197,6 +224,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
       assert_match re.to_regex, @connection.send("get_type_query", "user", [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     }
 
+#    @connection.drop_type :qualitysmith_user
     assert_nothing_raised {
       @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
     }

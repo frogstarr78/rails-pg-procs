@@ -47,14 +47,13 @@ module ActiveRecord
         end
       end
 
-      def procedures(stream)
-        @connection.procedures().each {|proc_row|
+      def procedures(stream, conditions=nil)
+        @connection.procedures(conditions).each { |proc_row|
           oid, name, namespace, owner, lang, is_agg, sec_def, is_strict, ret_set, volatile, nargs, ret_type, arg_types, arg_names, src, bin, acl = proc_row
           is_agg    = is_agg    == 't'
           is_strict = is_strict == 't'
           ret_set   = ret_set   == 't'
           volatile  = %w{immutable stable}.grep(/^#{volatile}.+/).to_s unless volatile == 'v'
-          lang      = @connection.select_value("SELECT lanname FROM pg_language WHERE oid = '#{lang}'")
           arg_names ||= ''
           args      = get_type(arg_types.split(" "))#.zip(arg_names.split(" "))
 
@@ -100,8 +99,9 @@ module ActiveRecord
       alias_method :procless_tables, :tables
       def tables(stream)
         types(stream)
-        procedures(stream)
+        procedures(stream, "!= 'sql'")
         procless_tables(stream)
+        procedures(stream, "= 'sql'")
       end
 
       alias_method :indexes_before_triggers, :indexes
@@ -123,12 +123,14 @@ module ActiveRecord
     class PostgreSQLAdapter < AbstractAdapter
       cattr_accessor :first_proc_oid
 #      @@first_proc_oid = 10634
-      @@first_proc_oid = "(SELECT (MAX(oid::int)-MIN(oid::int))/2 FROM pg_proc)"
-      def procedures
+      @@first_proc_oid = "(SELECT (MAX(pg_proc.oid::int)-MIN(pg_proc.oid::int))/2 FROM pg_proc)"
+      def procedures(lang=nil)
         query <<-end_sql
-          SELECT oid, proname, pronamespace, proowner, prolang, proisagg, prosecdef, proisstrict, proretset, provolatile, pronargs, prorettype, proargtypes, proargnames, prosrc, probin, proacl
-            FROM pg_proc
-           WHERE oid > #{self.class.first_proc_oid}
+          SELECT P.oid, proname, pronamespace, proowner, lanname, proisagg, prosecdef, proisstrict, proretset, provolatile, pronargs, prorettype, proargtypes, proargnames, prosrc, probin, proacl
+            FROM pg_proc P
+            JOIN pg_language L ON (P.prolang = L.oid)
+           WHERE P.oid > #{self.class.first_proc_oid}
+            #{'AND (lanname ' + lang + ')'unless lang.nil?}
         end_sql
       end
 
@@ -164,6 +166,7 @@ module ActiveRecord
       end
 
       def create_type(name, *columns)
+        drop_type(name) if types.find {|typ| typ.name == name.to_s }
         execute get_type_query(name, *columns)
       end
       
@@ -183,6 +186,10 @@ module ActiveRecord
       def create_proc(name, columns=[], options={}, &block)
         if select_value("SELECT count(oid) FROM pg_language WHERE lanname = 'plpgsql' ","count").to_i == 0
           execute("CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler")
+        end
+
+        if options[:force]
+          drop_proc(name, columns) rescue nil
         end
 
         if block_given?
