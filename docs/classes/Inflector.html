@@ -79,8 +79,8 @@
       <h3 class="section-bar">Methods</h3>
 
       <div class="name-list">
-      <a href="#M000022">symbolize</a>&nbsp;&nbsp;
-      <a href="#M000021">triggerize</a>&nbsp;&nbsp;
+      <a href="#M000035">symbolize</a>&nbsp;&nbsp;
+      <a href="#M000034">triggerize</a>&nbsp;&nbsp;
       </div>
     </div>
 
@@ -102,48 +102,48 @@
     <div id="methods">
       <h3 class="section-bar">Public Instance methods</h3>
 
-      <div id="method-M000022" class="method-detail">
-        <a name="M000022"></a>
+      <div id="method-M000035" class="method-detail">
+        <a name="M000035"></a>
 
         <div class="method-heading">
-          <a href="#M000022" class="method-signature">
+          <a href="#M000035" class="method-signature">
           <span class="method-name">symbolize</span><span class="method-args">(val)</span>
           </a>
         </div>
       
         <div class="method-description">
           <p><a class="source-toggle" href="#"
-            onclick="toggleCode('M000022-source');return false;">[Source]</a></p>
-          <div class="method-source-code" id="M000022-source">
+            onclick="toggleCode('M000035-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000035-source">
 <pre>
-    <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 11</span>
-11:   <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">symbolize</span>(<span class="ruby-identifier">val</span>)
-12:     <span class="ruby-keyword kw">return</span> <span class="ruby-node">&quot;'#{val}'&quot;</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">val</span> <span class="ruby-operator">=~</span> <span class="ruby-regexp re">/-/</span>
-13:     <span class="ruby-node">&quot;:#{val}&quot;</span>
-14:   <span class="ruby-keyword kw">end</span>
+    <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 13</span>
+13:   <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">symbolize</span>(<span class="ruby-identifier">val</span>)
+14:     <span class="ruby-keyword kw">return</span> <span class="ruby-node">&quot;'#{val}'&quot;</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">val</span> <span class="ruby-operator">=~</span> <span class="ruby-regexp re">/-/</span>
+15:     <span class="ruby-node">&quot;:#{val}&quot;</span>
+16:   <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
       </div>
 
-      <div id="method-M000021" class="method-detail">
-        <a name="M000021"></a>
+      <div id="method-M000034" class="method-detail">
+        <a name="M000034"></a>
 
         <div class="method-heading">
-          <a href="#M000021" class="method-signature">
+          <a href="#M000034" class="method-signature">
           <span class="method-name">triggerize</span><span class="method-args">(table_name, events=[], before=false)</span>
           </a>
         </div>
       
         <div class="method-description">
           <p><a class="source-toggle" href="#"
-            onclick="toggleCode('M000021-source');return false;">[Source]</a></p>
-          <div class="method-source-code" id="M000021-source">
+            onclick="toggleCode('M000034-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000034-source">
 <pre>
-   <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 7</span>
-7:   <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">triggerize</span>(<span class="ruby-identifier">table_name</span>, <span class="ruby-identifier">events</span>=[], <span class="ruby-identifier">before</span>=<span class="ruby-keyword kw">false</span>)
-8:     <span class="ruby-identifier">events</span>.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot; or &quot;</span>).<span class="ruby-identifier">sub</span>(<span class="ruby-value str">&quot;:&quot;</span>, <span class="ruby-value str">&quot;&quot;</span>).<span class="ruby-identifier">tr</span>(<span class="ruby-value str">&quot; &quot;</span>, <span class="ruby-value str">&quot;_&quot;</span>).<span class="ruby-identifier">downcase</span> <span class="ruby-operator">+</span> <span class="ruby-value str">&quot;_&quot;</span> <span class="ruby-operator">+</span> (<span class="ruby-identifier">before</span> <span class="ruby-value">? </span><span class="ruby-value str">&quot;before_&quot;</span> <span class="ruby-operator">:</span> <span class="ruby-value str">&quot;after_&quot;</span>) <span class="ruby-operator">+</span> <span class="ruby-identifier">table_name</span>.<span class="ruby-identifier">to_s</span> <span class="ruby-operator">+</span> <span class="ruby-value str">&quot;_trigger&quot;</span>
-9:   <span class="ruby-keyword kw">end</span>
+    <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 9</span>
+ 9:   <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">triggerize</span>(<span class="ruby-identifier">table_name</span>, <span class="ruby-identifier">events</span>=[], <span class="ruby-identifier">before</span>=<span class="ruby-keyword kw">false</span>)
+10:     <span class="ruby-identifier">events</span>.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot; or &quot;</span>).<span class="ruby-identifier">gsub</span>(<span class="ruby-value str">&quot;:&quot;</span>, <span class="ruby-value str">&quot;&quot;</span>).<span class="ruby-identifier">tr</span>(<span class="ruby-value str">&quot; &quot;</span>, <span class="ruby-value str">&quot;_&quot;</span>).<span class="ruby-identifier">downcase</span> <span class="ruby-operator">+</span> <span class="ruby-value str">&quot;_&quot;</span> <span class="ruby-operator">+</span> (<span class="ruby-identifier">before</span> <span class="ruby-value">? </span><span class="ruby-value str">&quot;before_&quot;</span> <span class="ruby-operator">:</span> <span class="ruby-value str">&quot;after_&quot;</span>) <span class="ruby-operator">+</span> <span class="ruby-identifier">table_name</span>.<span class="ruby-identifier">to_s</span> <span class="ruby-operator">+</span> <span class="ruby-value str">&quot;_trigger&quot;</span>
+11:   <span class="ruby-keyword kw">end</span>
 </pre>
           </div>
         </div>
