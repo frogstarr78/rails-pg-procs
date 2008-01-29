@@ -1,8 +1,8 @@
 require 'test/unit'
 require 'stringio'
 require 'runit/assert'
-require File.dirname(__FILE__) + '/../lib/rails_pg_procs'
-require File.dirname(__FILE__) + '/connection'
+require "#{File.dirname(__FILE__)}/../lib/rails_pg_procs"
+require "#{File.dirname(__FILE__)}/connection"
 
 class String
   def to_regex
@@ -24,7 +24,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
     @connection = ActiveRecord::Base.connection
     @connection.create_table(:test_table, :force => true) {|t|
       t.column :name, :text
-      t.column :when, :datetime
+      t.column :when, :timestamp
     }
 
     @query_body = "
@@ -36,15 +36,14 @@ class RailsPgProcsTest < Test::Unit::TestCase
 
   def teardown
     @connection.drop_table(:test_table)
-#    @connection.drop_type :qualitysmith_user
   end
 
   def test_constants
-    assert_equal 1<<0, ActiveRecord::SchemaDumper::ROW
-    assert_equal 1<<1, ActiveRecord::SchemaDumper::BEFORE
-    assert_equal 1<<2, ActiveRecord::SchemaDumper::INSERT
-    assert_equal 1<<3, ActiveRecord::SchemaDumper::DELETE
-    assert_equal 1<<4, ActiveRecord::SchemaDumper::UPDATE
+    assert_equal 1<<0, ActiveRecord::ConnectionAdapters::TriggerDefinition::ROW
+    assert_equal 1<<1, ActiveRecord::ConnectionAdapters::TriggerDefinition::BEFORE
+    assert_equal 1<<2, ActiveRecord::ConnectionAdapters::TriggerDefinition::INSERT
+    assert_equal 1<<3, ActiveRecord::ConnectionAdapters::TriggerDefinition::DELETE
+    assert_equal 1<<4, ActiveRecord::ConnectionAdapters::TriggerDefinition::UPDATE
   end
 
   def test_methods
@@ -63,19 +62,30 @@ class RailsPgProcsTest < Test::Unit::TestCase
         assert !@connection.triggers(:test_table).nil?, "Triggers for table :test_table returns nil"
         received = @connection.triggers(:test_table)
         assert_equal trigger_count + 1, received.size
-        assert_equal "insert_after_test_table_trigger", received.last[1]
+        assert_equal "insert_after_test_table_trigger", received.last.name
       }
     }
     assert_equal procedures_count, @connection.procedures().result.size
   end
 
   def test_functional_dump
-#    @connection.drop_type :qualitysmith_user
+    @connection.create_proc(:f_commacat, [:text, :text], :return => :text) { "BEGIN
+  IF (LENGTH($1) > 0 ) THEN
+     RETURN $1 || ', ' || $2;
+  ELSE
+     RETURN $2;
+  END IF;
+END;" }
+    begin
+      @connection.execute "DROP AGGREGATE comma(text);"
+      @connection.execute "CREATE AGGREGATE comma(BASETYPE=text, SFUNC=f_commacat, STYPE=text)"
+    rescue ActiveRecord::StatementInvalid
+    end
     @connection.create_type(:qualitysmith_user, [:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"])
     @connection.create_proc("name-with-hyphen", [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:update_trade_materials_statuses_logf, [], :return => :trigger) { "  BEGIN\n--Something else goes here\nEND;\n" }
     @connection.create_proc(:levenshtein, [], :return => :trigger, :resource => ['$libdir/fuzzystrmatch'], :lang => "c")
-    @connection.add_trigger(:test_table, [:insert, :update], :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)
+    @connection.add_trigger(:test_table, [:insert, :update], :row => true, :name => "update_trade-materials_statuses_logt", :function => :update_trade_materials_statuses_logf)
     @connection.add_trigger(:test_table, [:insert, :update], :function => :levenshtein)
     @connection.create_table(:a_table_defined_after_the_stored_proc, :force => true) {|t|
       t.column :name, :varchar
@@ -87,26 +97,36 @@ class RailsPgProcsTest < Test::Unit::TestCase
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, stream)
     received_sql = stream.string
 
-    f = File.open("out.rb", "w")
-    f.write received_sql
-    f.close
     assert_match('create_type(:qualitysmith_user, [:name, "character varying"], [:address, "character varying(20)"], [:zip, "character varying(5)"], [:phone, "numeric(10,0)"])'.to_regex, received_sql)
     assert_match("create_proc('name-with-hyphen'".to_regex, received_sql)
     assert_match('create_proc(:update_trade_materials_statuses_logf'.to_regex, received_sql)
     assert_match('create_proc(:levenshtein, []'.to_regex, received_sql)
-    assert_match('add_trigger(:test_table, [:insert, :update], :name => :insert_or_update_after_test_table_trigger, :function => :levenshtein)'.to_regex, received_sql)
-    assert_match('add_trigger(:test_table, [:insert, :update], :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)'.to_regex, received_sql)
+    assert_match('add_trigger(:test_table, [:insert, :update], :function => :levenshtein)'.to_regex, received_sql)
+    assert_match("add_trigger(:test_table, [:insert, :update], :row => true, :name => 'update_trade-materials_statuses_logt', :function => :update_trade_materials_statuses_logf)".to_regex, received_sql)
     assert_match('create_table "a_table_defined_after_the_stored_proc"'.to_regex, received_sql)
     assert_match("create_proc(:sql_proc_with_table_reference, [:int4], :return => :int4, :lang => 'sql') {\n    <<-sql_proc_with_table_reference_sql\n\nSELECT id FROM a_table_defined_after_the_stored_proc WHERE id = $1;\n    sql_proc_with_table_reference_sql\n  }".to_regex, received_sql.split("\n")[-9..-2].join("\n"))
+    assert_match("create_proc(:f_commacat, [:text, :text]".to_regex, received_sql)
+    assert_no_match("lang => 'internal'".to_regex, received_sql)
+    assert_no_match("create_proc(:comma".to_regex, received_sql)
 
-    @connection.remove_trigger(:test_table, :update_trade_materials_statuses_logt)
-    @connection.remove_trigger(:test_table, :insert_or_update_after_test_table_trigger)
-    @connection.drop_proc(:update_trade_materials_statuses_logf)
-    @connection.drop_proc(:levenshtein)
-    @connection.drop_proc('name-with-hyphen')
     @connection.drop_proc(:sql_proc_with_table_reference, [:int4])
-    @connection.drop_type(:qualitysmith_user)
     @connection.drop_table(:a_table_defined_after_the_stored_proc)
+    @connection.remove_trigger(:test_table, :insert_or_update_after_test_table_trigger)
+    @connection.remove_trigger(:test_table, "update_trade-materials_statuses_logt")
+    @connection.drop_proc(:levenshtein)
+    @connection.drop_proc(:update_trade_materials_statuses_logf)
+    @connection.drop_proc('name-with-hyphen')
+    @connection.drop_type(:qualitysmith_user)
+    begin
+      @connection.execute "DROP AGGREGATE comma(text)"
+    rescue ActiveRecord::StatementInvalid
+    end
+    @connection.drop_proc(:f_commacat, [:text, :text])
+  end
+
+  def test_sym_to_str
+    assert_equal '"abc"', "abc".to_sql_name
+    assert_equal '"abc"', "abc".to_sym.to_sql_name
   end
 
   def test_schema_dumper
@@ -199,13 +219,48 @@ class RailsPgProcsTest < Test::Unit::TestCase
     assert_not_equal proc_name, @connection.procedures.result.last[1]
   end
 
+  def test_trigger_definition_class
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, 'test_table', 'name', 0b00010101, 'function')
+    assert_equal('name',       trig.name)
+    assert_equal('test_table', trig.table)
+    assert_equal(0b00010101,   trig.binary_type)
+    assert_equal('function',   trig.procedure_name)
+    trig.binary_type = 0b00011101
+    assert_equal(29, trig.binary_type)
+    trig.binary_type = :insert, :update
+    assert_equal(20, trig.binary_type)
+    trig.send("binary_type=", :insert, :delete)
+    assert_equal(12, trig.binary_type)
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, 'test_table', nil, [:insert, :delete])
+    assert_equal('insert_or_delete_after_test_table_trigger',       trig.name)
+    assert_equal('insert_or_delete_after_test_table_trigger',       trig.procedure_name)
+
+    trig.procedure_name = "update_trigger"
+    assert_equal('insert_or_delete_after_test_table_trigger',       trig.name)
+    assert_equal('update_trigger'                           ,       trig.procedure_name)
+    assert trig.triggerized?
+    assert !trig.triggerized?(trig.procedure_name)
+  end 
+
   def test_calculations
-    dumper = ActiveRecord::SchemaDumper.new(@connection)
-    assert dumper.send("calc", 0b00010101, ActiveRecord::SchemaDumper::INSERT)
-    assert dumper.send("calc", 0b00010101, ActiveRecord::SchemaDumper::UPDATE)
-    assert dumper.send("calc", 0b00010101, ActiveRecord::SchemaDumper::ROW)
-    assert dumper.send("calc", 0b00001010, ActiveRecord::SchemaDumper::DELETE)
-    assert dumper.send("calc", 0b00001010, ActiveRecord::SchemaDumper::BEFORE)
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(1, 'test_table', 'name', 0b00010101, 'function')
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::INSERT))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::UPDATE))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::ROW))
+    trig.binary_type = 0b00001010
+    assert_equal(10, trig.binary_type)
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::DELETE))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::BEFORE))
+    trig.send("binary_type=", :insert, :row, :before)
+    assert_equal(7, trig.binary_type)
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::INSERT))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::BEFORE))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::ROW))
+    trig.send("binary_type=", :insert, :update)
+    trig.binary_type = 0b00010100
+    assert_equal(20, trig.binary_type)
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::INSERT))
+    assert(trig.send("calc", ActiveRecord::ConnectionAdapters::TriggerDefinition::UPDATE))
   end
 
   def test_create_type()
@@ -264,7 +319,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
       /STRICT/,
       /EXTERNAL SECURITY DEFINER/
     ].each {|re| 
-      assert_match(re, @connection.send("get_proc_query", "logf", [], :return => nil, :user => 'definer', :strict => true, :behavior => 'immutable') { @query_body })
+      assert_match(re, @connection.send("get_proc_query", "logf", [], :return => nil, :definer => true, :strict => true, :behavior => 'immutable') { @query_body })
     }
 
     [
@@ -306,18 +361,28 @@ class RailsPgProcsTest < Test::Unit::TestCase
     }
     count = @connection.select_value("select count(*) from pg_proc where proname = 'update_trade_materials_statuses_logf'", "count")
     assert_equal("0", count)
+
+    assert_equal('CASCADE',  @connection.send("cascade_or_restrict", true))
+    assert_equal('RESTRICT', @connection.send("cascade_or_restrict"))
+    assert_equal('RESTRICT', @connection.send("cascade_or_restrict", false))
   end
 
   def test_add_trigger
-    assert_equal("CREATE TRIGGER insert_or_update_after_trade_materials_trigger AFTER INSERT OR UPDATE ON trade_materials FOR EACH STATEMENT EXECUTE PROCEDURE insert_or_update_after_trade_materials_trigger();", \
-      @connection.send("get_trigger_query", "trade_materials", [:insert, :update])
-    )
-    assert_equal("CREATE TRIGGER update_trade_materials_statuses_logt AFTER INSERT OR UPDATE ON trade_materials FOR EACH STATEMENT EXECUTE PROCEDURE update_trade_materials_statuses_logt();", \
-      @connection.send("get_trigger_query", "trade_materials", [:insert, :update], :name => "update_trade_materials_statuses_logt")
-    )
-    assert_equal("CREATE TRIGGER update_trade_materials_statuses_logt BEFORE INSERT OR UPDATE ON trade_materials FOR EACH ROW EXECUTE PROCEDURE update_trade_materials_statuses_logf();", \
-      @connection.send("get_trigger_query", "trade_materials", [:insert, :update], :before => true, :row => true, :name => "update_trade_materials_statuses_logt", :function => "update_trade_materials_statuses_logf")
-    )
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", nil, [:insert, :update])
+    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE insert_or_update_after_trade_materials_trigger();', trig.to_sql_create)
+    assert_equal('  add_trigger(:trade_materials, [:insert, :update])', trig.to_rdl())
+
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", "update_trade_materials_statuses_logt", [:insert, :update])
+    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE update_trade_materials_statuses_logt();', trig.to_sql_create)
+    assert_equal('  add_trigger(:trade_materials, [:insert, :update], :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logt)', trig.to_rdl)
+
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", "update_trade_materials_statuses_logt", [:insert, :update, :before, :row], "update_trade_materials_statuses_logf")
+    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" BEFORE INSERT OR UPDATE ON "trade_materials" FOR EACH ROW EXECUTE PROCEDURE update_trade_materials_statuses_logf();', trig.to_sql_create)
+    assert_equal('  add_trigger(:trade_materials, [:insert, :update], :before => true, :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)', trig.to_rdl)
+
+    trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", nil, [:insert, :update], "update_trade_materials_statuses_logf")
+    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE update_trade_materials_statuses_logf();', trig.to_sql_create)
+    assert_equal('  add_trigger(:trade_materials, [:insert, :update], :function => :update_trade_materials_statuses_logf)', trig.to_rdl)
 
     @connection.create_proc("update_trade_materials_statuses_logf", [], :return => "trigger") { @query_body }
     assert_nothing_raised {
@@ -346,9 +411,9 @@ class RailsPgProcsTest < Test::Unit::TestCase
     assert_not_equal name.to_s, @connection.procedures.result.last[1]
   end
 
-  def with_trigger(table, columns=[], options={}, &block)
-    @connection.add_trigger(table, columns, options) 
+  def with_trigger(table, events=[], options={}, &block)
+    @connection.add_trigger(table, events, options) 
       yield
-    @connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, columns, options.has_key?(:before)))
+    @connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, events, options.has_key?(:before)))
   end
 end

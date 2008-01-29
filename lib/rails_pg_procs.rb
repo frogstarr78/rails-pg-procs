@@ -3,9 +3,11 @@ gem 'activerecord'
 require 'active_record'
 require "active_support/inflector"
 
+DEBUG = false
+
 module Inflector
   def triggerize(table_name, events=[], before=false)
-    events.join(" or ").sub(":", "").tr(" ", "_").downcase + "_" + (before ? "before_" : "after_") + table_name.to_s + "_trigger"
+    events.join(" or ").gsub(":", "").tr(" ", "_").downcase + "_" + (before ? "before_" : "after_") + table_name.to_s + "_trigger"
   end
 
   def symbolize(val)
@@ -14,16 +16,46 @@ module Inflector
   end
 end
 
+module SqlFormat
+  def to_sql_name
+    '"' + self.to_s + '"'
+  end
+end
+
+class Symbol
+  include SqlFormat
+end
+
+class String
+  include SqlFormat
+end
+
+module SchemaProcs
+  @@_cascade_or_restrict = Proc.new {|which| which     ? 'CASCADE' : 'RESTRICT' }
+  @@_strict_or_null      = Proc.new {|strict| strict   ? 'STRICT' : 'CALLED ON NULL INPUT' }
+  @@_definer_or_invoker  = Proc.new {|definer| definer ? 'DEFINER' : 'INVOKER' }
+  @@_behavior            = Proc.new {|volatile| %w{immutable stable volatile}.grep(/^#{volatile[0,1]}.+/).to_s }
+
+  def cascade_or_restrict(cascade=false)
+    @@_cascade_or_restrict.call(cascade)
+  end
+  def strict_or_null(is_strict=false)
+    @@_strict_or_null.call(is_strict)
+  end
+  def definer_or_invoker(definer=false)
+    @@_definer_or_invoker.call(definer)
+  end
+  def behavior(volatile='v')
+    @@_behavior.call(volatile)
+  end
+end
+
 # RailsPgProcs
 module ActiveRecord
   # This class is used to dump the database schema for some connection to some
   # output format (i.e., ActiveRecord::Schema).
   class SchemaDumper
-    ROW    = 0b00001
-    BEFORE = 0b00010
-    INSERT = 0b00100
-    DELETE = 0b01000
-    UPDATE = 0b10000
+    include SchemaProcs
 
     # TODO -Implement checks on SchemaDumper instance 
     # to ensure we do this only when using pg db.
@@ -47,13 +79,13 @@ module ActiveRecord
         end
       end
 
+      # TODO - Facilitate create_proc(name, [argname, argtype] and create_proc(name, [argmode, argname, argtype] ...
       def procedures(stream, conditions=nil)
         @connection.procedures(conditions).each { |proc_row|
           oid, name, namespace, owner, lang, is_agg, sec_def, is_strict, ret_set, volatile, nargs, ret_type, arg_types, arg_names, src, bin, acl = proc_row
           is_agg    = is_agg    == 't'
           is_strict = is_strict == 't'
           ret_set   = ret_set   == 't'
-          volatile  = %w{immutable stable}.grep(/^#{volatile}.+/).to_s unless volatile == 'v'
           arg_names ||= ''
           args      = get_type(arg_types.split(" "))#.zip(arg_names.split(" "))
 
@@ -61,7 +93,7 @@ module ActiveRecord
           stream.print ", :resource => ['#{bin}', '#{src}']" unless bin == '-'
           stream.print ", :set => true" if ret_set
           stream.print ", :strict => true" if is_strict
-          stream.print ", :behavior => '#{volatile}'" unless volatile == 'v'
+          stream.print ", :behavior => '#{behavior(volatile)}'" unless volatile == 'v'
           stream.print ", :lang => '#{lang}')"
           stream.print " {\n    <<-#{Inflector.underscore(name)}_sql\n#{src.chomp}\n    #{Inflector.underscore(name)}_sql\n  }" if bin == '-'
           stream.print "\n"
@@ -69,22 +101,9 @@ module ActiveRecord
       end
       def triggers(table_name, stream)
         triggers = @connection.triggers(table_name)
-        unless triggers.empty?
-          triggers.each {|trigger|
-            stream.print "  add_trigger(#{Inflector.symbolize(table_name)}" 
-           events = []
-            events.push(":insert") if calc(trigger.type, INSERT)
-            events.push(":update") if calc(trigger.type, UPDATE)
-            events.push(":delete") if calc(trigger.type, DELETE)
-
-            stream.print ", [" + events.join(", ") + "]"
-            stream.print ", :before => true" if calc(trigger.type, BEFORE)
-            stream.print ", :row => true" if calc(trigger.type, ROW)
-            stream.print ", :name => #{Inflector.symbolize(trigger.name)}" if Inflector.triggerize(table_name, events, calc(trigger.type, BEFORE)) != trigger.name
-            stream.print ", :function => #{Inflector.symbolize(trigger.procedure_name)}" if Inflector.triggerize(table_name, events, calc(trigger.type, BEFORE)) != trigger.name
-            stream.puts ")"
-          }
-        end
+        triggers.each {|trigger|
+          stream.puts trigger.to_rdl
+        }
         stream.puts unless triggers.empty?
       end
 
@@ -110,33 +129,147 @@ module ActiveRecord
         triggers(table, stream)
       end
 
-      def calc(int, bin)
-        eval(sprintf("0b%0.8b", int)) & bin > 0
-      end
   end
 
   module ConnectionAdapters
+    class ProcedureDefinition < Struct.new(:id, :name)
+    end
+    class TriggerDefinition #< Struct.new(:id, :table, :name, :binary_type, :procedure_name)
+      CLEAN  = 0b0
+      ROW    = 0b00001
+      BEFORE = 0b00010
+      INSERT = 0b00100
+      DELETE = 0b01000
+      UPDATE = 0b10000
 
-    class TriggerDefinition < Struct.new(:id, :name, :type, :procedure_name); end
+      attr_accessor :id, :table, :name, :procedure_name
+      attr_reader :binary_type
+      def initialize(id, table, name=nil, binary_type=[], procedure_name=nil)
+        puts "id #{id.inspect} table #{table.inspect} name #{name.inspect} binary_type #{binary_type.inspect} procedure_name #{procedure_name.inspect}" if DEBUG
+        @id                 = id
+        @table              = table
+        self.binary_type    = binary_type
+        self.name           = (name || triggerized_name)
+        self.procedure_name = (procedure_name || name || triggerized_name)
+        puts "id #{self.id.inspect} table #{self.table.inspect} name #{self.name.inspect} binary_type #{self.binary_type.inspect} procedure_name #{self.procedure_name.inspect}" if DEBUG
+      end
+
+      # that's to_r(uby)d(efinition)l(anguage)
+      def to_rdl() 
+        "  add_trigger(#{Inflector.symbolize(table)}" <<
+        ", [" + events.join(", ") + "]" <<
+        (      before? ? ", :before => true"  : "") <<
+        (         row? ? ", :row => true"     : "") <<
+        (!triggerized? ? ", :name => #{Inflector.symbolize(name)}" : "") <<
+        (!triggerized?(procedure_name) ? ", :function => #{Inflector.symbolize(procedure_name)}" : "") <<
+        ")"
+      end
+
+      def binary_type=(*types)
+#        print "types #{types.inspect} types[0] #{types[0].inspect} " if DEBUG
+        case types[0]
+          when Fixnum, Array
+            @binary_type = bin_typ(types[0])
+          else
+            @binary_type = bin_typ(types)
+        end
+      end
+
+#     TODO ---
+	  def to_sql_create()
+		  result = "CREATE TRIGGER "          << 
+        name.to_sql_name                  << 
+        (before? ? " BEFORE" : " AFTER")  <<
+        " "                               << 
+        (
+          events.collect {|event| 
+            event.to_s.upcase.gsub(/^:/, '') }.join(" OR ")
+        ) <<
+        " ON "                            << 
+        table.to_sql_name                 << 
+        " FOR EACH "                      << 
+        (row? ? "ROW" : "STATEMENT")      << 
+        " EXECUTE PROCEDURE "             << 
+        procedure_name.to_s               << 
+        "();"
+      result
+	  end
+
+    def triggerized?(nam=nil)
+      nam ||= self.name
+      triggerized_name == nam
+    end
+
+	  def before?
+	    calc(BEFORE)
+	  end
+
+	  def row?
+	    calc(ROW)
+		end
+
+      private
+
+      def triggerized_name
+        Inflector.triggerize(table, events, calc(BEFORE))
+      end
+
+      def events
+        events = []
+        events.push(":insert") if calc(INSERT)
+        events.push(":update") if calc(UPDATE)
+        events.push(":delete") if calc(DELETE)
+        events
+      end
+
+      def calc(bin)
+        eval(sprintf("0b%0.8b", self.binary_type())) & bin > 0
+      end
+
+      def bin_typ(typs)
+#        puts "typs #{typs.inspect} typs.class #{typs.class}" if DEBUG
+        case typs
+          when Fixnum
+            return typs
+          when Symbol
+            return bin_typ(typs.to_s)
+          when String
+            return typs.to_i if typs =~ /^\d+$/
+            return self.class.const_get(typs.upcase.to_sym)
+          when Array
+            ctype = 0
+            typs.each {|typ| 
+              ctype += bin_typ(typ)
+            }
+        end
+        ctype
+      end
+
+      # end private
+    end
     class TypeDefinition < Struct.new(:id, :name, :columns); end
 
+    # TODO -- Add Aggregates ability
     class PostgreSQLAdapter < AbstractAdapter
+      include SchemaProcs
+
       cattr_accessor :first_proc_oid
-#      @@first_proc_oid = 10634
       @@first_proc_oid = "(SELECT (MAX(pg_proc.oid::int)-MIN(pg_proc.oid::int))/2 FROM pg_proc)"
+
       def procedures(lang=nil)
         query <<-end_sql
           SELECT P.oid, proname, pronamespace, proowner, lanname, proisagg, prosecdef, proisstrict, proretset, provolatile, pronargs, prorettype, proargtypes, proargnames, prosrc, probin, proacl
             FROM pg_proc P
             JOIN pg_language L ON (P.prolang = L.oid)
            WHERE P.oid > #{self.class.first_proc_oid}
+             AND (proisagg = 'f')
             #{'AND (lanname ' + lang + ')'unless lang.nil?}
         end_sql
       end
 
       def triggers(table_name)
         query(<<-end_sql).collect {|row| TriggerDefinition.new(*row) }
-          SELECT T.oid, T.tgname, T.tgtype, P.proname
+          SELECT T.oid, C.relname, T.tgname, T.tgtype, P.proname
             FROM pg_trigger T
             JOIN pg_class   C ON (T.tgrelid = C.OID AND C.relname = '#{table_name}' AND T.tgisconstraint = 'f')
             JOIN pg_proc    P ON (T.tgfoid = P.OID)
@@ -170,19 +303,26 @@ module ActiveRecord
         execute get_type_query(name, *columns)
       end
       
-      def drop_type(name, drop_dependants="RESTRICT")
-        execute "DROP TYPE #{name} #{drop_dependants.to_s.upcase}"
+      def drop_type(name, cascade=false)
+        execute "DROP TYPE #{name} #{cascade_or_restrict(cascade)}"
       end
 
+#     Add a trigger to a table
       def add_trigger(table, events, options={})
-        execute get_trigger_query(table, events, options)
+        events += [:row]    if options.delete(:row)
+        events += [:before] if options.delete(:before)
+        trigger = TriggerDefinition.new(0, table, options[:name], events, options[:function])
+        execute trigger.to_sql_create
+#        execute get_trigger_query(table, events, options)
       end
 
 #      DROP TRIGGER name ON table [ CASCADE | RESTRICT ]
       def remove_trigger(table, name, options={})
-        execute "DROP TRIGGER #{name} ON #{table} #{options[:deep] || 'RESTRICT'};"
+        options[:name] = name
+        execute "DROP TRIGGER #{trigger_name(table, [], options).to_sql_name} ON #{table} #{cascade_or_restrict(options[:deep])};"
       end
 
+#      Create a stored procedure
       def create_proc(name, columns=[], options={}, &block)
         if select_value("SELECT count(oid) FROM pg_language WHERE lanname = 'plpgsql' ","count").to_i == 0
           execute("CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler")
@@ -197,25 +337,28 @@ module ActiveRecord
         elsif options[:resource]
           execute get_proc_query(name, columns, options)
         else
-          raise StatementInvalid.new
+          raise StatementInvalid.new("Missing function source")
         end
       end
 
 #      DROP FUNCTION name ( [ type [, ...] ] ) [ CASCADE | RESTRICT ]
 #     default RESTRICT
-      def drop_proc(name, columns=[], options={})
-        execute "DROP FUNCTION \"#{name}\"(#{columns.collect {|column| column}.join(", ")}) #{options[:deep] || 'RESTRICT'};"
+      def drop_proc(name, columns=[], cascade=false)
+        execute "DROP FUNCTION #{name.to_sql_name}(#{columns.collect {|column| column}.join(", ")}) #{cascade_or_restrict(cascade)};"
       end
 
-      private 
+      private
+        def trigger_name(table, events=[], options={})
+          options[:name] || Inflector.triggerize(table, events, options[:before])
+        end
+
 #       CREATE TRIGGER name { BEFORE | AFTER } { event [ OR ... ] }
 #       ON table [ FOR [ EACH ] { ROW | STATEMENT } ]
 #       EXECUTE PROCEDURE funcname ( arguments )
         def get_trigger_query(table, events, options={})
           event_str = events.collect {|event| event.to_s.upcase }.join(" OR ")
-          trigger_name = options[:name] || Inflector.triggerize(table, events, options[:before])
-          func_name = options[:function] || trigger_name
-          result = "CREATE TRIGGER #{trigger_name} #{(options[:before] ? "BEFORE" : "AFTER")} #{event_str} ON #{table} FOR EACH #{(options[:row] ? "ROW" : "STATEMENT")} EXECUTE PROCEDURE #{func_name}();"
+          func_name = options[:function] || trigger_name(table, events, options)
+          result = "CREATE TRIGGER #{trigger_name(table, events, options).to_sql_name} #{(options[:before] ? "BEFORE" : "AFTER")} #{event_str} ON #{table} FOR EACH #{(options[:row] ? "ROW" : "STATEMENT")} EXECUTE PROCEDURE #{func_name.to_sql_name}();"
         end
 
 #       Helper function that builds the sql query used to create a stored procedure.
@@ -229,8 +372,10 @@ module ActiveRecord
 #          strict = CALLED ON NULL INPUT (Otherwise STRICT, According to the 8.0 manual STRICT and RETURNS NULL ON NULL INPUT (RNONI)
 #		     behave the same so I didn't make a case for RNONI)
 #          user = INVOKER
+        def delim(name, options)
+          options[:delim] || "$#{Inflector.underscore(name)}_body$"
+        end
           
-        
 #       From PostgreSQL
 ##      CREATE [ OR REPLACE ] FUNCTION
 ##          name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
@@ -252,23 +397,21 @@ module ActiveRecord
           lang = options[:lang] || "plpgsql"
 
           if block_given?
-            body = "$#{Inflector.underscore(name)}_body$
-#{yield}
-$#{Inflector.underscore(name)}_body$"
+            body = "#{delim(name, options)}\n#{yield}\n#{delim(name, options)}"
           elsif options[:resource]
             options[:resource] += [name] if options[:resource].size == 1
             body = options[:resource].collect {|res| "'#{res}'" }.join(", ")
           else
-            raise StatementInvalid.new and return
+            raise StatementInvalid.new("Missing function source")
           end
-
+          
           result = "
-		  CREATE OR REPLACE FUNCTION \"#{name}\"(#{columns.collect{|column| column}.join(", ")}) #{returns} AS
+		  CREATE OR REPLACE FUNCTION #{name.to_sql_name}(#{columns.collect{|column| column}.join(", ")}) #{returns} AS
 			#{body}
 			LANGUAGE #{lang}
-			#{ (options[:behavior] || 'VOLATILE').upcase }
-			#{ options[:strict] ? 'STRICT' : 'CALLED ON NULL INPUT'}
-			EXTERNAL SECURITY #{ options[:user] == 'definer' ? 'DEFINER' : 'INVOKER' }
+			#{ behavior(options[:behavior] || 'v').upcase }
+			#{ strict_or_null(options[:strict]) }
+			EXTERNAL SECURITY #{ definer_or_invoker(options[:definer]) }
 		  "
         end
 
