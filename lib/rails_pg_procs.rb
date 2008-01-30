@@ -190,7 +190,7 @@ module ActiveRecord
         " FOR EACH "                      << 
         (row? ? "ROW" : "STATEMENT")      << 
         " EXECUTE PROCEDURE "             << 
-        procedure_name.to_s               << 
+        procedure_name.to_sql_name        << 
         "();"
       result
 	  end

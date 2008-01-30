@@ -369,19 +369,19 @@ END;" }
 
   def test_add_trigger
     trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", nil, [:insert, :update])
-    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE insert_or_update_after_trade_materials_trigger();', trig.to_sql_create)
+    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE "insert_or_update_after_trade_materials_trigger"();', trig.to_sql_create)
     assert_equal('  add_trigger(:trade_materials, [:insert, :update])', trig.to_rdl())
 
     trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", "update_trade_materials_statuses_logt", [:insert, :update])
-    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE update_trade_materials_statuses_logt();', trig.to_sql_create)
+    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE "update_trade_materials_statuses_logt"();', trig.to_sql_create)
     assert_equal('  add_trigger(:trade_materials, [:insert, :update], :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logt)', trig.to_rdl)
 
     trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", "update_trade_materials_statuses_logt", [:insert, :update, :before, :row], "update_trade_materials_statuses_logf")
-    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" BEFORE INSERT OR UPDATE ON "trade_materials" FOR EACH ROW EXECUTE PROCEDURE update_trade_materials_statuses_logf();', trig.to_sql_create)
+    assert_equal('CREATE TRIGGER "update_trade_materials_statuses_logt" BEFORE INSERT OR UPDATE ON "trade_materials" FOR EACH ROW EXECUTE PROCEDURE "update_trade_materials_statuses_logf"();', trig.to_sql_create)
     assert_equal('  add_trigger(:trade_materials, [:insert, :update], :before => true, :row => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf)', trig.to_rdl)
 
     trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", nil, [:insert, :update], "update_trade_materials_statuses_logf")
-    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE update_trade_materials_statuses_logf();', trig.to_sql_create)
+    assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE "update_trade_materials_statuses_logf"();', trig.to_sql_create)
     assert_equal('  add_trigger(:trade_materials, [:insert, :update], :function => :update_trade_materials_statuses_logf)', trig.to_rdl)
 
     @connection.create_proc("update_trade_materials_statuses_logf", [], :return => "trigger") { @query_body }
