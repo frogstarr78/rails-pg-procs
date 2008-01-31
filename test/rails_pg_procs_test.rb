@@ -6,7 +6,7 @@ require "#{File.dirname(__FILE__)}/connection"
 
 class String
   def to_regex
-    Regexp.new(self.tr(' ', "\\\s").gsub(/([\(\)\[\]\{\}\.\\\$])/) {|s| '\\' + s })
+    Regexp.new(self.gsub(/([\s\n\t]+)/, '\\1+').gsub(/([\(\)\[\]\{\}\.\\\$])/) {|s| '\\' + s })
   end
 end
 
@@ -365,6 +365,39 @@ END;" }
     assert_equal('CASCADE',  @connection.send("cascade_or_restrict", true))
     assert_equal('RESTRICT', @connection.send("cascade_or_restrict"))
     assert_equal('RESTRICT', @connection.send("cascade_or_restrict", false))
+  end
+
+  def test_view_definition_class
+    view = ActiveRecord::ConnectionAdapters::ViewDefinition.new(0, :trade_materials_view) { "SELECT 'aview'" }
+    [
+      /CREATE OR REPLACE VIEW/,
+      /\"trade_materials_view\"/,
+      /\n[\s\t]+AS SELECT 'aview'/,
+    ].each {|re|
+      assert_match(re, view.to_sql)
+    }
+    assert_equal('DROP VIEW "trade_materials_view" RESTRICT', view.to_sql(:drop))
+
+    [
+      /create_view\(:trade_materials_view\)/,
+      /SELECT 'aview'/,
+      /\$trade_materials_view_body\$/
+    ].each {|re|
+      assert_match(re, view.to_rdl())
+    }
+
+    count = @connection.select_value("SELECT count(*) FROM pg_class WHERE relname = 'trade_materials_view' AND relkind = 'v'", "count")
+    assert_equal("0", count)
+    assert_nothing_raised {
+      @connection.create_view("trade_materials_view") { "SELECT 'aview'" }
+    }
+    count = @connection.select_value("SELECT count(*) FROM pg_class WHERE relname = 'trade_materials_view' AND relkind = 'v'", "count")
+    assert_equal("1", count)
+    assert_nothing_raised {
+      @connection.drop_view("trade_materials_view")
+    }
+    count = @connection.select_value("SELECT count(*) FROM pg_class WHERE relname = 'trade_materials_view' AND relkind = 'v'", "count")
+    assert_equal("0", count)
   end
 
   def test_add_trigger

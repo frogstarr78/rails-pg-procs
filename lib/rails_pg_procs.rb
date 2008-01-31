@@ -134,7 +134,41 @@ module ActiveRecord
   module ConnectionAdapters
     class ProcedureDefinition < Struct.new(:id, :name)
     end
-    class TriggerDefinition #< Struct.new(:id, :table, :name, :binary_type, :procedure_name)
+
+    class ViewDefinition
+      include SchemaProcs
+      attr_accessor :id, :name, :columns, :view_body
+      def initialize(id, name, columns=[], &block)
+        puts "id #{id.inspect} name #{name.inspect} columns #{columns.inspect}" if DEBUG
+        @id            = id
+        self.name      = name
+        self.columns   = columns
+        self.view_body = block
+        puts "id #{self.id.inspect} name #{self.name.inspect} columns #{self.columns.inspect} view_body #{self.view_body.inspect}" if DEBUG
+      end
+
+      def to_rdl
+        "  create_view(#{Inflector.symbolize(name)}) { $#{name}_body$\n    #{view_body.call}\n  $#{name}_body$ }"
+			end
+
+#     CREATE [ OR REPLACE ] [ TEMP | TEMPORARY ] VIEW NAME [ ( column_name [, ...] ) ]
+#     AS query
+#     [ WITH [ CASCADED | LOCAL ] CHECK OPTION ]
+#			DROP VIEW [ IF EXISTS ] NAME [, ...] [ CASCADE | RESTRICT ]
+		def to_sql(action="create", options={})
+			case action
+				when "create", :create
+					ret = "CREATE OR REPLACE#{' TEMPORARY' if options[:temp] } VIEW #{name.to_sql_name}
+					AS #{view_body.call}"
+				# TODO - [ WITH [ CASCADED | LOCAL ] CHECK OPTION ]
+        when "drop", :drop
+          ret = "DROP VIEW #{name.to_sql_name} #{cascade_or_restrict(options[:cascade])}"
+      end
+      ret
+		end
+	end
+
+    class TriggerDefinition
       CLEAN  = 0b0
       ROW    = 0b00001
       BEFORE = 0b00010
@@ -175,25 +209,27 @@ module ActiveRecord
         end
       end
 
-#     TODO ---
-	  def to_sql_create()
-		  result = "CREATE TRIGGER "          << 
-        name.to_sql_name                  << 
-        (before? ? " BEFORE" : " AFTER")  <<
-        " "                               << 
-        (
-          events.collect {|event| 
-            event.to_s.upcase.gsub(/^:/, '') }.join(" OR ")
-        ) <<
-        " ON "                            << 
-        table.to_sql_name                 << 
-        " FOR EACH "                      << 
-        (row? ? "ROW" : "STATEMENT")      << 
-        " EXECUTE PROCEDURE "             << 
-        procedure_name.to_sql_name        << 
-        "();"
-      result
-	  end
+#     CREATE TRIGGER name { BEFORE | AFTER } { event [ OR ... ] }
+#     ON table [ FOR [ EACH ] { ROW | STATEMENT } ]
+#     EXECUTE PROCEDURE funcname ( arguments )
+			def to_sql_create()
+				result = "CREATE TRIGGER "          << 
+				name.to_sql_name                  << 
+				(before? ? " BEFORE" : " AFTER")  <<
+				" "                               << 
+				(
+					events.collect {|event| 
+						event.to_s.upcase.gsub(/^:/, '') }.join(" OR ")
+				) <<
+				" ON "                            << 
+				table.to_sql_name                 << 
+				" FOR EACH "                      << 
+				(row? ? "ROW" : "STATEMENT")      << 
+				" EXECUTE PROCEDURE "             << 
+				procedure_name.to_sql_name        << 
+				"();"
+				result
+		end
 
     def triggerized?(nam=nil)
       nam ||= self.name
@@ -307,13 +343,22 @@ module ActiveRecord
         execute "DROP TYPE #{name} #{cascade_or_restrict(cascade)}"
       end
 
+      def create_view(name, columns=[], options={}, &block)
+        view = ViewDefinition.new(0, name, columns) { yield } 
+        execute view.to_sql(:create, options)
+			end
+
+      def drop_view(name, options={})
+        view = ViewDefinition.new(0, name)
+        execute view.to_sql(:drop, options)
+      end
+
 #     Add a trigger to a table
       def add_trigger(table, events, options={})
         events += [:row]    if options.delete(:row)
         events += [:before] if options.delete(:before)
         trigger = TriggerDefinition.new(0, table, options[:name], events, options[:function])
         execute trigger.to_sql_create
-#        execute get_trigger_query(table, events, options)
       end
 
 #      DROP TRIGGER name ON table [ CASCADE | RESTRICT ]
@@ -350,15 +395,6 @@ module ActiveRecord
       private
         def trigger_name(table, events=[], options={})
           options[:name] || Inflector.triggerize(table, events, options[:before])
-        end
-
-#       CREATE TRIGGER name { BEFORE | AFTER } { event [ OR ... ] }
-#       ON table [ FOR [ EACH ] { ROW | STATEMENT } ]
-#       EXECUTE PROCEDURE funcname ( arguments )
-        def get_trigger_query(table, events, options={})
-          event_str = events.collect {|event| event.to_s.upcase }.join(" OR ")
-          func_name = options[:function] || trigger_name(table, events, options)
-          result = "CREATE TRIGGER #{trigger_name(table, events, options).to_sql_name} #{(options[:before] ? "BEFORE" : "AFTER")} #{event_str} ON #{table} FOR EACH #{(options[:row] ? "ROW" : "STATEMENT")} EXECUTE PROCEDURE #{func_name.to_sql_name}();"
         end
 
 #       Helper function that builds the sql query used to create a stored procedure.
@@ -419,13 +455,13 @@ module ActiveRecord
           raise StatementInvalid.new if columns.empty?
           "CREATE TYPE #{quote_column_name(name)} AS (
             #{columns.collect{|column,type|
-			  if column.is_a?(Hash)
-				column.collect { |column, type| "#{quote_column_name(column)} #{type}" }
-			  else
-			  "#{quote_column_name(column)} #{type}"
-			  end
-            }.join(",\n")}
-          )"
+					if column.is_a?(Hash)
+					column.collect { |column, type| "#{quote_column_name(column)} #{type}" }
+					else
+					"#{quote_column_name(column)} #{type}"
+					end
+							}.join(",\n")}
+						)"
         end
     end
   end
