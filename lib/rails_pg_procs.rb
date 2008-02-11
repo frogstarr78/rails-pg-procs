@@ -289,15 +289,13 @@ module ActiveRecord
     class PostgreSQLAdapter < AbstractAdapter
       include SchemaProcs
 
-      cattr_accessor :first_proc_oid
-      @@first_proc_oid = "(SELECT (MAX(pg_proc.oid::int)-MIN(pg_proc.oid::int))/2 FROM pg_proc)"
-
       def procedures(lang=nil)
         query <<-end_sql
           SELECT P.oid, proname, pronamespace, proowner, lanname, proisagg, prosecdef, proisstrict, proretset, provolatile, pronargs, prorettype, proargtypes, proargnames, prosrc, probin, proacl
             FROM pg_proc P
             JOIN pg_language L ON (P.prolang = L.oid)
-           WHERE P.oid > #{self.class.first_proc_oid}
+            JOIN pg_namespace N ON (P.pronamespace = N.oid)
+           WHERE N.nspname = 'public'
              AND (proisagg = 'f')
             #{'AND (lanname ' + lang + ')'unless lang.nil?}
         end_sql

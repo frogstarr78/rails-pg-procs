@@ -79,6 +79,10 @@ END;" }
     begin
       @connection.execute "DROP AGGREGATE comma(text);"
       @connection.execute "CREATE AGGREGATE comma(BASETYPE=text, SFUNC=f_commacat, STYPE=text)"
+	  @connection.execute "DROP SCHEMA somewhere_else"
+      @connection.execute "CREATE SCHEMA somewhere_else"
+	  @connection.execute "DROP FUNCTION somewhere_else.afunc()"
+	  @connection.execute "CREATE FUNCTION somewhere_else.afunc () returns void as '' language 'plpgsql'"
     rescue ActiveRecord::StatementInvalid
     end
     @connection.create_type(:qualitysmith_user, [:name, :varchar], {:address => "varchar(20)"}, [:zip, "varchar(5)"], [:phone, "numeric(10,0)"])
@@ -108,6 +112,7 @@ END;" }
     assert_match("create_proc(:f_commacat, [:text, :text]".to_regex, received_sql)
     assert_no_match("lang => 'internal'".to_regex, received_sql)
     assert_no_match("create_proc(:comma".to_regex, received_sql)
+    assert_no_match("create_proc(:afunc".to_regex, received_sql)
 
     @connection.drop_proc(:sql_proc_with_table_reference, [:int4])
     @connection.drop_table(:a_table_defined_after_the_stored_proc)
@@ -119,6 +124,8 @@ END;" }
     @connection.drop_type(:qualitysmith_user)
     begin
       @connection.execute "DROP AGGREGATE comma(text)"
+	  @connection.execute "DROP FUNCTION somewhere_else.afunc()"
+	  @connection.execute "DROP SCHEMA somewhere_else"
     rescue ActiveRecord::StatementInvalid
     end
     @connection.drop_proc(:f_commacat, [:text, :text])
