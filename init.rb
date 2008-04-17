@@ -1,2 +1,3 @@
 # Include hook code here
-#require "#{File.dirname(__FILE__)}/lib/rails_pg_procs"
+$LOAD_PATH.push File.dirname(__FILE__)
+require 'lib/rails_pg_procs'
