@@ -1,4 +1,5 @@
 require 'test/unit'
+require 'test_extensions'
 require 'stringio'
 require 'runit/assert'
 require "#{File.dirname(__FILE__)}/../lib/rails_pg_procs"
@@ -23,8 +24,8 @@ class RailsPgProcsTest < Test::Unit::TestCase
     super
     @connection = ActiveRecord::Base.connection
     @connection.create_table(:test_table, :force => true) {|t|
-      t.column :name, :text
-      t.column :when, :timestamp
+      t.text      :name
+      t.timestamp :when
     }
 
     @query_body = "
@@ -36,6 +37,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
 
   def teardown
     @connection.drop_table(:test_table)
+    @connection.drop_table(:permissions)
   end
 
   def test_constants
@@ -136,8 +138,7 @@ END;" }
     assert_equal '"abc"', "abc".to_sym.to_sql_name
   end
 
-  def test_schema_dumper
-    # a simple test
+  def test_simple_schema_dumper
     with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
       with_trigger(:test_table, [:insert], :row => true) {
         assert_no_exception(NoMethodError) do 
@@ -154,8 +155,9 @@ END;" }
         end
       }
     }
+  end
 
-    # a more complicated test
+  def test_complicated_schema_dumper
     with_proc(:update_trade_materials_statuses_logf, [], :return => :trigger) {
       with_trigger(:test_table, [:insert, :update], :before => true, :name => :update_trade_materials_statuses_logt, :function => :update_trade_materials_statuses_logf) {
         assert_no_exception(NoMethodError) do 
@@ -173,8 +175,9 @@ END;" }
         end
       }
     }
+  end
 
-    # a more-more complicated test
+  def test_more_complicated_schema_dumper
     with_proc(:levenshtein, [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch'], :strict => true, :behavior => 'immutable', :lang => "C") {
       assert_no_exception(NoMethodError) do 
         dumper = ActiveRecord::SchemaDumper.new(@connection)
@@ -185,7 +188,9 @@ END;" }
         assert_equal "  create_proc(:levenshtein, [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch', 'levenshtein'], :strict => true, :behavior => 'immutable', :lang => 'c')", received.split("\n")[-1]
       end
     }
+  end
 
+  def test_schema_dumper_type
     # a type test
 #    @connection.drop_type :qualitysmith_user
     @connection.create_type(:qualitysmith_user, [:name, "varchar(10)"], {:zip => "numeric(5,0)"}, [:is_customer => :boolean])
@@ -198,7 +203,9 @@ END;" }
        assert_equal '  create_type(:qualitysmith_user, [:name, "character varying(10)"], [:zip, "numeric(5,0)"], [:is_customer, :boolean])', received.chomp
     end
     @connection.drop_type(:qualitysmith_user)
+  end
 
+  def test_schema_dumper_exceptions
     proc_name, columns = "test_sql_type_proc_with_table_reference", [:integer]
     assert_not_equal proc_name, @connection.procedures.result.last[1]
     assert_raise ActiveRecord::StatementInvalid do
@@ -438,22 +445,23 @@ END;" }
     @connection.drop_proc("update_trade_materials_statuses_logf", [])
   end
 
-  def with_proc(name, columns=[], options={}, &block)
-    assert_not_equal name, @connection.procedures.result.last[1]
-    if options[:resource]
-      @connection.create_proc(name, columns, options)
-    else
-      @connection.create_proc(name, columns, options) { @query_body }
-    end
-    assert_equal name.to_s, @connection.procedures.result.last[1]
-      yield
-    @connection.drop_proc(name, columns)
-    assert_not_equal name.to_s, @connection.procedures.result.last[1]
-  end
+  private
+		def with_proc(name, columns=[], options={}, &block)
+			assert_not_equal name, @connection.procedures.result.last[1]
+			if options[:resource]
+				@connection.create_proc(name, columns, options)
+			else
+				@connection.create_proc(name, columns, options) { @query_body }
+			end
+			assert_equal name.to_s, @connection.procedures.result.last[1]
+				yield
+			@connection.drop_proc(name, columns)
+			assert_not_equal name.to_s, @connection.procedures.result.last[1]
+		end
 
-  def with_trigger(table, events=[], options={}, &block)
-    @connection.add_trigger(table, events, options) 
-      yield
-    @connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, events, options.has_key?(:before)))
-  end
+		def with_trigger(table, events=[], options={}, &block)
+			@connection.add_trigger(table, events, options) 
+				yield
+			@connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, events, options.has_key?(:before)))
+		end
 end
