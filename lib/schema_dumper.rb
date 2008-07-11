@@ -48,6 +48,14 @@ module ActiveRecord
         }
       end
 
+      def schemas(stream)
+        schemas = @connection.schemas
+        schemas.each {|schema|
+          stream.puts schema.to_rdl
+        }
+        stream.puts unless schemas.empty?
+      end
+
       def triggers(table_name, stream)
         triggers = @connection.triggers(table_name)
         triggers.each {|trigger|

@@ -1,9 +1,17 @@
-DEBUG = false
 module ActiveRecord
   module ConnectionAdapters
     # TODO -- Add Aggregates ability
     class PostgreSQLAdapter < AbstractAdapter
       include SchemaProcs
+
+      def schemas 
+        query(<<-end_sql).collect {|row| SchemaDefinition.new(*row) }
+          SELECT N.nspname, S.usename
+            FROM pg_namespace N
+            JOIN pg_shadow    S ON (N.nspowner = S.usesysid)
+           WHERE N.nspname NOT IN ('pg_toast', 'pg_temp_1', 'pg_catalog', 'public', 'information_schema')
+        end_sql
+      end
 
       def procedures(lang=nil)
         query <<-end_sql
@@ -67,6 +75,22 @@ module ActiveRecord
         execute view.to_sql(:drop, options)
       end
 
+      def create_schema!(name, owner='postgres', options={})
+        drop_schema(name, options)
+        create_schema(name, owner, options)
+			end
+
+      def create_schema(name, owner='postgres', options={})
+        view = SchemaDefinition.new(name, owner)
+        execute view.to_sql(:create, options)
+        search_path = select_one("SHOW search_path")["search_path"].split(",")
+        execute "SET search_path TO #{([name.to_s] | search_path).join(', ')}"
+			end
+
+      def drop_schema(name, options={})
+         execute SchemaDefinition.new(name).to_sql(:drop, options)
+      end
+
 #     Add a trigger to a table
       def add_trigger(table, events, options={})
         events += [:row]    if options.delete(:row)
@@ -84,7 +108,7 @@ module ActiveRecord
 #      Create a stored procedure
       def create_proc(name, columns=[], options={}, &block)
         if select_value("SELECT count(oid) FROM pg_language WHERE lanname = 'plpgsql' ","count").to_i == 0
-          execute("CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler AS '$libdir/plpgsql', 'plpgsql_call_handler' LANGUAGE c")
+#          execute("CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler AS '$libdir/plpgsql', 'plpgsql_call_handler' LANGUAGE c")
           execute("CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler")
         end
 

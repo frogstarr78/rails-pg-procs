@@ -11,13 +11,11 @@ module ActiveRecord
       attr_accessor :id, :table, :name, :procedure_name
       attr_reader :binary_type
       def initialize(id, table, name=nil, binary_type=[], procedure_name=nil)
-        puts "id #{id.inspect} table #{table.inspect} name #{name.inspect} binary_type #{binary_type.inspect} procedure_name #{procedure_name.inspect}" if DEBUG
         @id                 = id
         @table              = table
         self.binary_type    = binary_type
         self.name           = (name || triggerized_name)
         self.procedure_name = (procedure_name || name || triggerized_name)
-        puts "id #{self.id.inspect} table #{self.table.inspect} name #{self.name.inspect} binary_type #{self.binary_type.inspect} procedure_name #{self.procedure_name.inspect}" if DEBUG
       end
 
       # that's to_r(uby)d(efinition)l(anguage)
@@ -32,7 +30,6 @@ module ActiveRecord
       end
 
       def binary_type=(*types)
-#        print "types #{types.inspect} types[0] #{types[0].inspect} " if DEBUG
         case types[0]
           when Fixnum, Array
             @binary_type = bin_typ(types[0])
@@ -95,7 +92,6 @@ module ActiveRecord
       end
 
       def bin_typ(typs)
-#        puts "typs #{typs.inspect} typs.class #{typs.class}" if DEBUG
         case typs
           when Fixnum
             return typs

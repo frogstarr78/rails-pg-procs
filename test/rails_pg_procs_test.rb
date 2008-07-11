@@ -37,7 +37,6 @@ class RailsPgProcsTest < Test::Unit::TestCase
 
   def teardown
     @connection.drop_table(:test_table)
-    @connection.drop_table(:permissions)
   end
 
   def test_constants
@@ -54,12 +53,11 @@ class RailsPgProcsTest < Test::Unit::TestCase
     }
 
     assert !@connection.procedures().nil?, "@connection#procedures returns nil"
-    @connection.drop_proc(:insert_after_test_table_trigger) if "insert_after_test_table_trigger" == @connection.procedures.result.last[1]
-    procedures_count = @connection.procedures().result.size
+    procedures_count = @connection.procedures.size
     trigger_count = @connection.triggers(:test_table).size
     with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
       assert_equal 0, trigger_count
-      assert_equal procedures_count + 1, @connection.procedures().result.size
+      assert_equal procedures_count + 1, @connection.procedures.size
       with_trigger(:test_table, [:insert], :row => true) {
         assert !@connection.triggers(:test_table).nil?, "Triggers for table :test_table returns nil"
         received = @connection.triggers(:test_table)
@@ -67,7 +65,7 @@ class RailsPgProcsTest < Test::Unit::TestCase
         assert_equal "insert_after_test_table_trigger", received.last.name
       }
     }
-    assert_equal procedures_count, @connection.procedures().result.size
+    assert_equal procedures_count, @connection.procedures.size
   end
 
   def test_functional_dump
@@ -81,9 +79,8 @@ END;" }
     begin
       @connection.execute "DROP AGGREGATE comma(text);"
       @connection.execute "CREATE AGGREGATE comma(BASETYPE=text, SFUNC=f_commacat, STYPE=text)"
-	  @connection.execute "DROP SCHEMA somewhere_else"
-      @connection.execute "CREATE SCHEMA somewhere_else"
-	  @connection.execute "DROP FUNCTION somewhere_else.afunc()"
+	  @connection.drop_schema "somewhere_else"
+      @connection.create_schema "somewhere_else"
 	  @connection.execute "CREATE FUNCTION somewhere_else.afunc () returns void as '' language 'plpgsql'"
     rescue ActiveRecord::StatementInvalid
     end
@@ -126,8 +123,7 @@ END;" }
     @connection.drop_type(:qualitysmith_user)
     begin
       @connection.execute "DROP AGGREGATE comma(text)"
-	  @connection.execute "DROP FUNCTION somewhere_else.afunc()"
-	  @connection.execute "DROP SCHEMA somewhere_else"
+	  @connection.drop_schema "somewhere_else", :cascade => true
     rescue ActiveRecord::StatementInvalid
     end
     @connection.drop_proc(:f_commacat, [:text, :text])
@@ -205,9 +201,22 @@ END;" }
     @connection.drop_type(:qualitysmith_user)
   end
 
+  def test_schema_dumper_schema
+    @connection.create_schema(:rails, :postgres)
+    assert_no_exception(NoMethodError) do 
+      dumper = ActiveRecord::SchemaDumper.new(@connection)
+      stream = StringIO.new
+      dumper.send(:schemas, stream)
+      stream.rewind
+      received = stream.read
+       assert_match /create_schema\(:rails, "postgres"\)/, received.chomp
+    end
+    @connection.drop_schema(:rails, :cascade => true)
+  end
+
   def test_schema_dumper_exceptions
     proc_name, columns = "test_sql_type_proc_with_table_reference", [:integer]
-    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    assert_equal [], @connection.procedures
     assert_raise ActiveRecord::StatementInvalid do
       @connection.create_proc(proc_name, columns, :return => nil, :lang => :sql) { 
         <<-sql
@@ -215,12 +224,12 @@ END;" }
         sql
       }
     end
-    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    assert_equal [], @connection.procedures
     @connection.create_table(:a_table_that_doesnt_yet_exist, :force => true) { |t|
       t.column :name, :varchar
     }
 
-    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    assert_equal [], @connection.procedures
     assert_nothing_raised do
       @connection.create_proc(proc_name, columns, :return => :integer, :lang => :sql, :force => true) { 
         <<-sql
@@ -230,7 +239,7 @@ END;" }
     end
     @connection.drop_table(:a_table_that_doesnt_yet_exist)
     @connection.drop_proc(proc_name, columns)
-    assert_not_equal proc_name, @connection.procedures.result.last[1]
+    assert_equal [], @connection.procedures
   end
 
   def test_trigger_definition_class
@@ -414,6 +423,25 @@ END;" }
     assert_equal("0", count)
   end
 
+  def test_schema_definition_class
+    view = ActiveRecord::ConnectionAdapters::SchemaDefinition.new('rails', 'postgres')
+    assert_match(/CREATE SCHEMA "rails" AUTHORIZATION "postgres"/, view.to_sql)
+    assert_equal('DROP SCHEMA "rails" RESTRICT', view.to_sql(:drop))
+    assert_match(/create_schema\(:rails, "postgres"\)/, view.to_rdl())
+
+    count_query = "SELECT count(*) FROM pg_namespace WHERE nspname = 'rails'"
+    assert_equal("0", @connection.select_one(count_query)["count"])
+    assert_nothing_raised {
+      @connection.create_schema(:rails, :postgres)
+    }
+    assert_equal('rails, "$user", public', @connection.select_one("SHOW search_path")["search_path"])
+    assert_equal("1", @connection.select_one(count_query)["count"])
+    assert_nothing_raised {
+      @connection.drop_schema("rails")
+    }
+    assert_equal("0", @connection.select_one(count_query)["count"])
+  end
+
   def test_add_trigger
     trig = ActiveRecord::ConnectionAdapters::TriggerDefinition.new(0, "trade_materials", nil, [:insert, :update])
     assert_equal('CREATE TRIGGER "insert_or_update_after_trade_materials_trigger" AFTER INSERT OR UPDATE ON "trade_materials" FOR EACH STATEMENT EXECUTE PROCEDURE "insert_or_update_after_trade_materials_trigger"();', trig.to_sql_create)
@@ -446,22 +474,22 @@ END;" }
   end
 
   private
-		def with_proc(name, columns=[], options={}, &block)
-			assert_not_equal name, @connection.procedures.result.last[1]
-			if options[:resource]
-				@connection.create_proc(name, columns, options)
-			else
-				@connection.create_proc(name, columns, options) { @query_body }
-			end
-			assert_equal name.to_s, @connection.procedures.result.last[1]
-				yield
-			@connection.drop_proc(name, columns)
-			assert_not_equal name.to_s, @connection.procedures.result.last[1]
-		end
+    def with_proc(name, columns=[], options={}, &block)
+        assert_equal [], @connection.procedures
+        if options[:resource]
+            @connection.create_proc(name, columns, options)
+        else
+            @connection.create_proc(name, columns, options) { @query_body }
+        end
+        assert_equal name.to_s, @connection.procedures.last[1]
+            yield
+        @connection.drop_proc(name, columns)
+        assert_equal [], @connection.procedures
+    end
 
-		def with_trigger(table, events=[], options={}, &block)
-			@connection.add_trigger(table, events, options) 
-				yield
-			@connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, events, options.has_key?(:before)))
-		end
+    def with_trigger(table, events=[], options={}, &block)
+        @connection.add_trigger(table, events, options) 
+            yield
+        @connection.remove_trigger(table, options[:name] || Inflector.triggerize(table, events, options.has_key?(:before)))
+    end
 end
