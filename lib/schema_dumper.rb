@@ -37,7 +37,7 @@ module ActiveRecord
           arg_names ||= ''
           args      = get_type(arg_types.split(" "))#.zip(arg_names.split(" "))
 
-          stream.print "  create_proc(#{Inflector.symbolize(name)}, [#{args}], :return => #{get_type(ret_type)}"
+          stream.print "  create_proc(#{name.to_sql_name}, [#{args}], :return => #{get_type(ret_type)}"
           stream.print ", :resource => ['#{bin}', '#{src}']" unless bin == '-'
           stream.print ", :set => true" if ret_set
           stream.print ", :strict => true" if is_strict
@@ -66,22 +66,28 @@ module ActiveRecord
 
       def types(stream)
         @connection.types.each {|type|
-          stream.print "  create_type(#{Inflector.symbolize(type.name)}, "
-          stream.print "#{ type.columns.collect{|column, type| "[#{Inflector.symbolize(column)}, #{get_type(type)}]"}.join(", ") }"
-          stream.puts  ")"
+          stream.print "  create_type #{type.name.to_sql_name}, "
+          stream.puts "#{ type.columns.collect{|column, type| "[#{Inflector.symbolize(column)}, #{get_type(type)}]"}.join(", ") }"
         }
       end
 
       alias_method :procless_tables, :tables
       def tables(stream)
+        schemas(stream)
         types(stream)
         procedures(stream, "!= 'sql'")
         procless_tables(stream)
         procedures(stream, "= 'sql'")
       end
 
+      alias_method :schemaless_table, :table
+      def table table, stream
+        schemaless_table table, stream
+      end
+
       alias_method :indexes_before_triggers, :indexes
       def indexes(table, stream)
+#        schema, table = table.split '.'
         indexes_before_triggers(table, stream)
         triggers(table, stream)
       end

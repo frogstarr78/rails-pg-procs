@@ -4,12 +4,14 @@ module ActiveRecord
     class PostgreSQLAdapter < AbstractAdapter
       include SchemaProcs
 
+      @@ignore_namespaces = %w(pg_toast pg_temp_1 pg_catalog public information_schema)
+
       def schemas 
         query(<<-end_sql).collect {|row| SchemaDefinition.new(*row) }
           SELECT N.nspname, S.usename
             FROM pg_namespace N
             JOIN pg_shadow    S ON (N.nspowner = S.usesysid)
-           WHERE N.nspname NOT IN ('pg_toast', 'pg_temp_1', 'pg_catalog', 'public', 'information_schema')
+           WHERE N.nspname NOT IN (#{@@ignore_namespaces.collect {|nsp| nsp.to_sql_value }.join(',')})
         end_sql
       end
 
@@ -56,13 +58,38 @@ module ActiveRecord
         types
       end
 
+#      def tables(name = nil)
+#        schemas = schema_search_path.split(/,/).map { |p| quote(p) }.join(',')
+#        query(<<-SQL, name).map { |row| row[0] << '.' << row[1] }
+#          SELECT N.nspname, C.relname
+#            FROM pg_class C
+#            JOIN pg_namespace N ON (C.relnamespace = N.oid)
+#           WHERE N.nspname IN (#{schemas})
+#             AND C.relkind = 'r'
+#        SQL
+#      end
+
+      # TODO Implement this
+      def views #:nodoc:
+      end
+
+      def columns(table_name, name = nil)
+        # Limit, precision, and scale are all handled by the superclass.
+        column_definitions(table_name).collect do |name, type, default, notnull|
+          PostgreSQLColumn.new(name, default, type, notnull == 'f')
+        end
+      end
+
       def create_type(name, *columns)
-        drop_type(name) if types.find {|typ| typ.name == name.to_s }
+        if type = types.find {|typ| typ.name == name.to_s }
+          drop_type(type.name)
+        end
         execute get_type_query(name, *columns)
       end
       
       def drop_type(name, cascade=false)
-        execute "DROP TYPE #{name} #{cascade_or_restrict(cascade)}"
+#        puts "drop_type(#{name.to_sql_name})"
+        execute "DROP TYPE #{name.to_sql_name} #{cascade_or_restrict(cascade)}"
       end
 
       def create_view(name, columns=[], options={}, &block)
@@ -75,20 +102,21 @@ module ActiveRecord
         execute view.to_sql(:drop, options)
       end
 
-      def create_schema!(name, owner='postgres', options={})
-        drop_schema(name, options)
-        create_schema(name, owner, options)
-			end
-
       def create_schema(name, owner='postgres', options={})
-        view = SchemaDefinition.new(name, owner)
-        execute view.to_sql(:create, options)
-        search_path = select_one("SHOW search_path")["search_path"].split(",")
-        execute "SET search_path TO #{([name.to_s] | search_path).join(', ')}"
-			end
+        if schema = schemas.find {|schema| schema.name.to_s == name.to_s }
+          drop_schema(schema.name, :cascade => true)
+        end
+        execute (schema = SchemaDefinition.new(name, owner)).to_sql(:create, options)
+        self.schema_search_path = (self.schema_search_path.split(",") | [schema.name]).join(',')
+#        self.schema_search_path = ( [schema.name] | self.schema_search_path.split(",") ).join(',')
+      end
 
       def drop_schema(name, options={})
-         execute SchemaDefinition.new(name).to_sql(:drop, options)
+        search_path = self.schema_search_path.split(",")
+        self.schema_search_path = search_path.join(',') if search_path.delete(name.to_s)
+        if schema = schemas.find {|schema| schema.name.to_s == name.to_s }
+          execute SchemaDefinition.new(name).to_sql(:drop, options)
+        end
       end
 
 #     Add a trigger to a table
@@ -108,7 +136,7 @@ module ActiveRecord
 #      Create a stored procedure
       def create_proc(name, columns=[], options={}, &block)
         if select_value("SELECT count(oid) FROM pg_language WHERE lanname = 'plpgsql' ","count").to_i == 0
-#          execute("CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler AS '$libdir/plpgsql', 'plpgsql_call_handler' LANGUAGE c")
+          execute("CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler AS '$libdir/plpgsql', 'plpgsql_call_handler' LANGUAGE c")
           execute("CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler")
         end
 
@@ -132,6 +160,25 @@ module ActiveRecord
       end
 
       private
+#        def column_definitions(table_name) #:nodoc:
+#          schema, table_name = table_name.split '.'
+#          unless table_name
+#            table_name  = schema
+#            schema      = 'public'
+#          end
+#          query <<-end_sql
+#            SELECT a.attname, format_type(a.atttypid, a.atttypmod), d.adsrc, a.attnotnull
+#              FROM pg_attribute a LEFT JOIN pg_attrdef d
+#                ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+#              JOIN pg_class c ON (a.attrelid = c.oid)
+#              JOIN pg_namespace n ON (c.relnamespace = n.oid)
+#             WHERE c.relname = '#{table_name}'
+#               AND n.nspname = '#{schema}'
+#               AND a.attnum > 0 AND NOT a.attisdropped
+#             ORDER BY a.attnum
+#          end_sql
+#        end
+
         def trigger_name(table, events=[], options={})
           options[:name] || Inflector.triggerize(table, events, options[:before])
         end
@@ -148,6 +195,7 @@ module ActiveRecord
 #		     behave the same so I didn't make a case for RNONI)
 #          user = INVOKER
         def delim(name, options)
+          name = name.split('.').last if name.is_a?(String) && name.include?('.')
           options[:delim] || "$#{Inflector.underscore(name)}_body$"
         end
           
@@ -165,10 +213,7 @@ module ActiveRecord
 #          [ WITH ( isStrict &| isCacheable ) ]
 		# TODO Implement [ [ argmode ] [ argname ] argtype ]
         def get_proc_query(name, columns=[], options={}, &block)
-          returns = ''
-          if options.has_key?(:return)
-            returns = "RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}"
-          end
+          returns = "RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}"
           lang = options[:lang] || "plpgsql"
 
           if block_given?

@@ -20,13 +20,12 @@ module ActiveRecord
 
       # that's to_r(uby)d(efinition)l(anguage)
       def to_rdl() 
-        "  add_trigger(#{Inflector.symbolize(table)}" <<
+        "  add_trigger #{table.to_sql_name}" <<
         ", [" + events.join(", ") + "]" <<
         (      before? ? ", :before => true"  : "") <<
         (         row? ? ", :row => true"     : "") <<
         (!triggerized? ? ", :name => #{Inflector.symbolize(name)}" : "") <<
-        (!triggerized?(procedure_name) ? ", :function => #{Inflector.symbolize(procedure_name)}" : "") <<
-        ")"
+        (!triggerized?(procedure_name) ? ", :function => #{Inflector.symbolize(procedure_name)}" : "")
       end
 
       def binary_type=(*types)

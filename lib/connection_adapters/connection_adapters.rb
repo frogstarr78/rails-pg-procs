@@ -1,3 +1,4 @@
+require 'connection_adapters/schema_statements'
 require 'connection_adapters/schema_definition'
 require 'connection_adapters/aggregagtes_definition'
 require 'connection_adapters/postgresql_adapter'

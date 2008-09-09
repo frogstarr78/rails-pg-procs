@@ -4,7 +4,7 @@ module ActiveRecord
       include SchemaProcs
 
       def to_rdl
-        "  create_schema(#{Inflector.symbolize(name)}, #{owner.to_sql_name})"
+        "  create_schema #{name.to_sql_name}, #{owner.to_sql_name}"
       end
 
 #      CREATE SCHEMA schemaname [ AUTHORIZATION username ] [ schema_element [ ... ] ]
