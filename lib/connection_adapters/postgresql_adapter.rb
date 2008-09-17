@@ -6,6 +6,10 @@ module ActiveRecord
 
       @@ignore_namespaces = %w(pg_toast pg_temp_1 pg_catalog public information_schema)
 
+      def drop_database name
+        execute "DROP DATABASE#{' IF EXISTS' if postgresql_version >= 80200} #{name}"
+      end
+
       def schemas 
         query(<<-end_sql).collect {|row| SchemaDefinition.new(*row) }
           SELECT N.nspname, S.usename
