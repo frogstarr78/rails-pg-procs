@@ -86,7 +86,7 @@ module ActiveRecord
 
       def create_type(name, *columns)
         if type = types.find {|typ| typ.name == name.to_s }
-          drop_type(type.name)
+          drop_type(type.name, true)
         end
         execute get_type_query(name, *columns)
       end
