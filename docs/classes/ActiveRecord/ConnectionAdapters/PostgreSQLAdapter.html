@@ -1,0 +1,589 @@
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Class: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+    
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+  
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }</style>" )
+  
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+
+    <div id="classHeader">
+        <table class="header-table">
+        <tr class="top-aligned-row">
+          <td><strong>Class</strong></td>
+          <td class="class-name-in-header">ActiveRecord::ConnectionAdapters::PostgreSQLAdapter</td>
+        </tr>
+        <tr class="top-aligned-row">
+            <td><strong>In:</strong></td>
+            <td>
+                <a href="../../../files/lib/rails_pg_procs_rb.html">
+                lib/rails_pg_procs.rb
+                </a>
+        <br />
+            </td>
+        </tr>
+
+        <tr class="top-aligned-row">
+            <td><strong>Parent:</strong></td>
+            <td>
+                AbstractAdapter
+            </td>
+        </tr>
+        </table>
+    </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+
+
+  <div id="contextContent">
+
+    <div id="description">
+      <p>
+TODO &#8212; Add Aggregates ability
+</p>
+
+    </div>
+
+
+   </div>
+
+    <div id="method-list">
+      <h3 class="section-bar">Methods</h3>
+
+      <div class="name-list">
+      <a href="#M000017">add_trigger</a>&nbsp;&nbsp;
+      <a href="#M000019">create_proc</a>&nbsp;&nbsp;
+      <a href="#M000015">create_type</a>&nbsp;&nbsp;
+      <a href="#M000023">delim</a>&nbsp;&nbsp;
+      <a href="#M000020">drop_proc</a>&nbsp;&nbsp;
+      <a href="#M000016">drop_type</a>&nbsp;&nbsp;
+      <a href="#M000024">get_proc_query</a>&nbsp;&nbsp;
+      <a href="#M000022">get_trigger_query</a>&nbsp;&nbsp;
+      <a href="#M000025">get_type_query</a>&nbsp;&nbsp;
+      <a href="#M000012">procedures</a>&nbsp;&nbsp;
+      <a href="#M000018">remove_trigger</a>&nbsp;&nbsp;
+      <a href="#M000021">trigger_name</a>&nbsp;&nbsp;
+      <a href="#M000013">triggers</a>&nbsp;&nbsp;
+      <a href="#M000014">types</a>&nbsp;&nbsp;
+      </div>
+    </div>
+
+  </div>
+
+
+    <!-- if includes -->
+    <div id="includes">
+      <h3 class="section-bar">Included Modules</h3>
+
+      <div id="includes-list">
+        <span class="include-name"><a href="../../SchemaProcs.html">SchemaProcs</a></span>
+      </div>
+    </div>
+
+    <div id="section">
+
+
+
+
+
+      
+
+
+    <!-- if method_list -->
+    <div id="methods">
+      <h3 class="section-bar">Public Instance methods</h3>
+
+      <div id="method-M000017" class="method-detail">
+        <a name="M000017"></a>
+
+        <div class="method-heading">
+          <a href="#M000017" class="method-signature">
+          <span class="method-name">add_trigger</span><span class="method-args">(table, events, options={})</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Add a trigger to a table
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000017-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000017-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 314</span>
+314:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">add_trigger</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>={})
+315:         <span class="ruby-identifier">events</span> <span class="ruby-operator">+=</span> [<span class="ruby-identifier">:row</span>]    <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>.<span class="ruby-identifier">delete</span>(<span class="ruby-identifier">:row</span>)
+316:         <span class="ruby-identifier">events</span> <span class="ruby-operator">+=</span> [<span class="ruby-identifier">:before</span>] <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>.<span class="ruby-identifier">delete</span>(<span class="ruby-identifier">:before</span>)
+317:         <span class="ruby-identifier">trigger</span> = <span class="ruby-constant">TriggerDefinition</span>.<span class="ruby-identifier">new</span>(<span class="ruby-value">0</span>, <span class="ruby-identifier">table</span>, <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:name</span>], <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:function</span>])
+318:         <span class="ruby-identifier">execute</span> <span class="ruby-identifier">trigger</span>.<span class="ruby-identifier">to_sql_create</span>
+319: <span class="ruby-comment cmt">#        execute get_trigger_query(table, events, options)</span>
+320:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000019" class="method-detail">
+        <a name="M000019"></a>
+
+        <div class="method-heading">
+          <a href="#M000019" class="method-signature">
+          <span class="method-name">create_proc</span><span class="method-args">(name, columns=[], options={}) {|| ...}</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Create a stored procedure
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000019-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000019-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 329</span>
+329:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">create_proc</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={}, <span class="ruby-operator">&amp;</span><span class="ruby-identifier">block</span>)
+330:         <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">select_value</span>(<span class="ruby-value str">&quot;SELECT count(oid) FROM pg_language WHERE lanname = 'plpgsql' &quot;</span>,<span class="ruby-value str">&quot;count&quot;</span>).<span class="ruby-identifier">to_i</span> <span class="ruby-operator">==</span> <span class="ruby-value">0</span>
+331:           <span class="ruby-identifier">execute</span>(<span class="ruby-value str">&quot;CREATE TRUSTED PROCEDURAL LANGUAGE plpgsql HANDLER plpgsql_call_handler&quot;</span>)
+332:         <span class="ruby-keyword kw">end</span>
+333: 
+334:         <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:force</span>]
+335:           <span class="ruby-identifier">drop_proc</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>) <span class="ruby-keyword kw">rescue</span> <span class="ruby-keyword kw">nil</span>
+336:         <span class="ruby-keyword kw">end</span>
+337: 
+338:         <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">block_given?</span>
+339:           <span class="ruby-identifier">execute</span> <span class="ruby-identifier">get_proc_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>, <span class="ruby-identifier">options</span>) { <span class="ruby-keyword kw">yield</span> }
+340:         <span class="ruby-keyword kw">elsif</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>]
+341:           <span class="ruby-identifier">execute</span> <span class="ruby-identifier">get_proc_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>, <span class="ruby-identifier">options</span>)
+342:         <span class="ruby-keyword kw">else</span>
+343:           <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span>(<span class="ruby-value str">&quot;Missing function source&quot;</span>)
+344:         <span class="ruby-keyword kw">end</span>
+345:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000015" class="method-detail">
+        <a name="M000015"></a>
+
+        <div class="method-heading">
+          <a href="#M000015" class="method-signature">
+          <span class="method-name">create_type</span><span class="method-args">(name, *columns)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000015-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000015-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 304</span>
+304:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">create_type</span>(<span class="ruby-identifier">name</span>, <span class="ruby-operator">*</span><span class="ruby-identifier">columns</span>)
+305:         <span class="ruby-identifier">drop_type</span>(<span class="ruby-identifier">name</span>) <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">types</span>.<span class="ruby-identifier">find</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">typ</span><span class="ruby-operator">|</span> <span class="ruby-identifier">typ</span>.<span class="ruby-identifier">name</span> <span class="ruby-operator">==</span> <span class="ruby-identifier">name</span>.<span class="ruby-identifier">to_s</span> }
+306:         <span class="ruby-identifier">execute</span> <span class="ruby-identifier">get_type_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-operator">*</span><span class="ruby-identifier">columns</span>)
+307:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000020" class="method-detail">
+        <a name="M000020"></a>
+
+        <div class="method-heading">
+          <a href="#M000020" class="method-signature">
+          <span class="method-name">drop_proc</span><span class="method-args">(name, columns=[], cascade=false)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <pre>
+ DROP FUNCTION name ( [ type [, ...] ] ) [ CASCADE | RESTRICT ]
+</pre>
+<p>
+default RESTRICT
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000020-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000020-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 349</span>
+349:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">drop_proc</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">cascade</span>=<span class="ruby-keyword kw">false</span>)
+350:         <span class="ruby-identifier">execute</span> <span class="ruby-node">&quot;DROP FUNCTION #{name.to_sql_name}(#{columns.collect {|column| column}.join(&quot;, &quot;)}) #{cascade_or_restrict(cascade)};&quot;</span>
+351:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000016" class="method-detail">
+        <a name="M000016"></a>
+
+        <div class="method-heading">
+          <a href="#M000016" class="method-signature">
+          <span class="method-name">drop_type</span><span class="method-args">(name, cascade=false)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000016-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000016-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 309</span>
+309:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">drop_type</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">cascade</span>=<span class="ruby-keyword kw">false</span>)
+310:         <span class="ruby-identifier">execute</span> <span class="ruby-node">&quot;DROP TYPE #{name} #{cascade_or_restrict(cascade)}&quot;</span>
+311:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000012" class="method-detail">
+        <a name="M000012"></a>
+
+        <div class="method-heading">
+          <a href="#M000012" class="method-signature">
+          <span class="method-name">procedures</span><span class="method-args">(lang=nil)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000012-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000012-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 259</span>
+259:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">procedures</span>(<span class="ruby-identifier">lang</span>=<span class="ruby-keyword kw">nil</span>)
+260:         <span class="ruby-identifier">query</span> <span class="ruby-value str">&quot;SELECT P.oid, proname, pronamespace, proowner, lanname, proisagg, prosecdef, proisstrict, proretset, provolatile, pronargs, prorettype, proargtypes, proargnames, prosrc, probin, proacl\nFROM pg_proc P\nJOIN pg_language L ON (P.prolang = L.oid)\nWHERE P.oid &gt; \#{self.class.first_proc_oid}\nAND (proisagg = 'f')\n\#{'AND (lanname ' + lang + ')'unless lang.nil?}\n&quot;</span>
+261:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000018" class="method-detail">
+        <a name="M000018"></a>
+
+        <div class="method-heading">
+          <a href="#M000018" class="method-signature">
+          <span class="method-name">remove_trigger</span><span class="method-args">(table, name, options={})</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+DROP TRIGGER name ON table [ CASCADE | RESTRICT ]
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000018-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000018-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 323</span>
+323:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">remove_trigger</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">name</span>, <span class="ruby-identifier">options</span>={})
+324:         <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:name</span>] = <span class="ruby-identifier">name</span>
+325:         <span class="ruby-identifier">execute</span> <span class="ruby-node">&quot;DROP TRIGGER #{trigger_name(table, [], options).to_sql_name} ON #{table} #{cascade_or_restrict(options[:deep])};&quot;</span>
+326:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000013" class="method-detail">
+        <a name="M000013"></a>
+
+        <div class="method-heading">
+          <a href="#M000013" class="method-signature">
+          <span class="method-name">triggers</span><span class="method-args">(table_name)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000013-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000013-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 271</span>
+271:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">triggers</span>(<span class="ruby-identifier">table_name</span>)
+272:         <span class="ruby-identifier">query</span>(<span class="ruby-value str">&quot;SELECT T.oid, C.relname, T.tgname, T.tgtype, P.proname\nFROM pg_trigger T\nJOIN pg_class   C ON (T.tgrelid = C.OID AND C.relname = '\#{table_name}' AND T.tgisconstraint = 'f')\nJOIN pg_proc    P ON (T.tgfoid = P.OID)\n&quot;</span>).<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">row</span><span class="ruby-operator">|</span> <span class="ruby-constant">TriggerDefinition</span>.<span class="ruby-identifier">new</span>(<span class="ruby-operator">*</span><span class="ruby-identifier">row</span>) }
+273:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000014" class="method-detail">
+        <a name="M000014"></a>
+
+        <div class="method-heading">
+          <a href="#M000014" class="method-signature">
+          <span class="method-name">types</span><span class="method-args">()</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000014-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000014-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 281</span>
+281:       <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">types</span>
+282:         <span class="ruby-identifier">result</span> = <span class="ruby-identifier">query</span>(<span class="ruby-value str">&quot;SELECT T.oid, T.typname, A.attname, format_type(A.atttypid, A.atttypmod) AS type\nFROM pg_type      T\nJOIN pg_class     C ON (T.typrelid = C.oid)\nJOIN pg_attribute A ON (A.attrelid = C.oid AND C.relkind = 'c')\n&quot;</span>)
+283: 
+284:         <span class="ruby-identifier">type_id</span> = <span class="ruby-keyword kw">nil</span>
+285:         <span class="ruby-identifier">types</span> = []
+286:         <span class="ruby-identifier">result</span>.<span class="ruby-identifier">each</span> { <span class="ruby-operator">|</span><span class="ruby-identifier">row</span><span class="ruby-operator">|</span>
+287:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">type_id</span> <span class="ruby-operator">!=</span> <span class="ruby-identifier">row</span>[<span class="ruby-value">0</span>]
+288:             <span class="ruby-identifier">types</span> <span class="ruby-operator">&lt;&lt;</span> <span class="ruby-constant">TypeDefinition</span>.<span class="ruby-identifier">new</span>(<span class="ruby-identifier">row</span>[<span class="ruby-value">0</span>], <span class="ruby-identifier">row</span>[<span class="ruby-value">1</span>], [])
+289:             <span class="ruby-identifier">type_id</span> = <span class="ruby-identifier">row</span>[<span class="ruby-value">0</span>]
+290:           <span class="ruby-keyword kw">end</span>
+291: 
+292:           <span class="ruby-identifier">types</span>.<span class="ruby-identifier">last</span>.<span class="ruby-identifier">columns</span> <span class="ruby-operator">&lt;&lt;</span> [<span class="ruby-identifier">row</span>[<span class="ruby-value">2</span>], <span class="ruby-identifier">row</span>[<span class="ruby-value">3</span>]]
+293:         }
+294: 
+295:         <span class="ruby-identifier">types</span>
+296:       <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="section-bar">Private Instance methods</h3>
+
+      <div id="method-M000023" class="method-detail">
+        <a name="M000023"></a>
+
+        <div class="method-heading">
+          <a href="#M000023" class="method-signature">
+          <span class="method-name">delim</span><span class="method-args">(name, options)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+Helper function that builds the sql query used to create a stored
+procedure. Mostly this is here so we can unit test the generated sql.
+Either an option[:resource] or block must be defined for this method.
+Otherwise an ActiveRecord::StatementInvalid exception is raised. Defaults
+are:
+</p>
+<pre>
+   RETURNS (no default -- which is cheap since that means you have to call this method w/ the options Hash) TODO: fix this
+   LANGUAGE = plpgsql (The plugin will add this if you don't have it added already)
+   behavior = VOLATILE (Don't specify IMMUTABLE or STABLE and this will be added for you)
+   strict = CALLED ON NULL INPUT (Otherwise STRICT, According to the 8.0 manual STRICT and RETURNS NULL ON NULL INPUT (RNONI)
+             behave the same so I didn't make a case for RNONI)
+   user = INVOKER
+</pre>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000023-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000023-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 378</span>
+378:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">delim</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">options</span>)
+379:           <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:delim</span>] <span class="ruby-operator">||</span> <span class="ruby-node">&quot;$#{Inflector.underscore(name)}_body$&quot;</span>
+380:         <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000024" class="method-detail">
+        <a name="M000024"></a>
+
+        <div class="method-heading">
+          <a href="#M000024" class="method-signature">
+          <span class="method-name">get_proc_query</span><span class="method-args">(name, columns=[], options={}, &amp;block)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <pre>
+      From PostgreSQL
+      CREATE [ OR REPLACE ] FUNCTION
+          name ( [ [ argmode ] [ argname ] argtype [, ...] ] )
+          [ RETURNS rettype ]
+        { LANGUAGE langname
+          | IMMUTABLE | STABLE | VOLATILE
+          | CALLED ON NULL INPUT | RETURNS NULL ON NULL INPUT | STRICT
+         | [ EXTERNAL ] SECURITY INVOKER | [ EXTERNAL ] SECURITY DEFINER
+          | AS 'definition'
+         | AS 'obj_file', 'link_symbol'
+       } ...
+         [ WITH ( isStrict &amp;| isCacheable ) ]
+</pre>
+<p>
+TODO Implement [ [ argmode ] [ argname ] argtype ]
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000024-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000024-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 395</span>
+395:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_proc_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-identifier">columns</span>=[], <span class="ruby-identifier">options</span>={}, <span class="ruby-operator">&amp;</span><span class="ruby-identifier">block</span>)
+396:           <span class="ruby-identifier">returns</span> = <span class="ruby-value str">''</span>
+397:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>.<span class="ruby-identifier">has_key?</span>(<span class="ruby-identifier">:return</span>)
+398:             <span class="ruby-identifier">returns</span> = <span class="ruby-node">&quot;RETURNS#{' SETOF' if options[:set]} #{options[:return] || 'VOID'}&quot;</span>
+399:           <span class="ruby-keyword kw">end</span>
+400:           <span class="ruby-identifier">lang</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:lang</span>] <span class="ruby-operator">||</span> <span class="ruby-value str">&quot;plpgsql&quot;</span>
+401: 
+402:           <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">block_given?</span>
+403:             <span class="ruby-identifier">body</span> = <span class="ruby-node">&quot;#{delim(name, options)}\n#{yield}\n#{delim(name, options)}&quot;</span>
+404:           <span class="ruby-keyword kw">elsif</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>]
+405:             <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>] <span class="ruby-operator">+=</span> [<span class="ruby-identifier">name</span>] <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">size</span> <span class="ruby-operator">==</span> <span class="ruby-value">1</span>
+406:             <span class="ruby-identifier">body</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:resource</span>].<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">res</span><span class="ruby-operator">|</span> <span class="ruby-node">&quot;'#{res}'&quot;</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot;, &quot;</span>)
+407:           <span class="ruby-keyword kw">else</span>
+408:             <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span>(<span class="ruby-value str">&quot;Missing function source&quot;</span>)
+409:           <span class="ruby-keyword kw">end</span>
+410:           
+411:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;
+412:                   CREATE OR REPLACE FUNCTION #{name.to_sql_name}(#{columns.collect{|column| column}.join(&quot;, &quot;)}) #{returns} AS
+413:                         #{body}
+414:                         LANGUAGE #{lang}
+415:                         #{ behavior(options[:behavior] || 'v').upcase }
+416:                         #{ strict_or_null(options[:strict]) }
+417:                         EXTERNAL SECURITY #{ definer_or_invoker(options[:definer]) }
+418:                   &quot;</span>
+419:         <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000022" class="method-detail">
+        <a name="M000022"></a>
+
+        <div class="method-heading">
+          <a href="#M000022" class="method-signature">
+          <span class="method-name">get_trigger_query</span><span class="method-args">(table, events, options={})</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p>
+CREATE TRIGGER name { BEFORE | AFTER } { event [ OR &#8230; ] } ON table [
+FOR [ EACH ] { ROW | STATEMENT } ] EXECUTE PROCEDURE funcname ( arguments )
+</p>
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000022-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000022-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 361</span>
+361:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_trigger_query</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>={})
+362:           <span class="ruby-identifier">event_str</span> = <span class="ruby-identifier">events</span>.<span class="ruby-identifier">collect</span> {<span class="ruby-operator">|</span><span class="ruby-identifier">event</span><span class="ruby-operator">|</span> <span class="ruby-identifier">event</span>.<span class="ruby-identifier">to_s</span>.<span class="ruby-identifier">upcase</span> }.<span class="ruby-identifier">join</span>(<span class="ruby-value str">&quot; OR &quot;</span>)
+363:           <span class="ruby-identifier">func_name</span> = <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:function</span>] <span class="ruby-operator">||</span> <span class="ruby-identifier">trigger_name</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>)
+364:           <span class="ruby-identifier">result</span> = <span class="ruby-node">&quot;CREATE TRIGGER #{trigger_name(table, events, options).to_sql_name} #{(options[:before] ? &quot;BEFORE&quot; : &quot;AFTER&quot;)} #{event_str} ON #{table} FOR EACH #{(options[:row] ? &quot;ROW&quot; : &quot;STATEMENT&quot;)} EXECUTE PROCEDURE #{func_name.to_sql_name}();&quot;</span>
+365:         <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000025" class="method-detail">
+        <a name="M000025"></a>
+
+        <div class="method-heading">
+          <a href="#M000025" class="method-signature">
+          <span class="method-name">get_type_query</span><span class="method-args">(name, *columns)</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000025-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000025-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 421</span>
+421:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">get_type_query</span>(<span class="ruby-identifier">name</span>, <span class="ruby-operator">*</span><span class="ruby-identifier">columns</span>)
+422:           <span class="ruby-identifier">raise</span> <span class="ruby-constant">StatementInvalid</span>.<span class="ruby-identifier">new</span> <span class="ruby-keyword kw">if</span> <span class="ruby-identifier">columns</span>.<span class="ruby-identifier">empty?</span>
+423:           <span class="ruby-node">&quot;CREATE TYPE #{quote_column_name(name)} AS (
+424:             #{columns.collect{|column,type|
+425:                           if column.is_a?(Hash)
+426:                                 column.collect { |column, type| &quot;#{quote_column_name(column)} #{type}&quot; }
+427:                           else
+428:                           &quot;#{quote_column_name(column)} #{type}&quot;
+429:                           end
+430:             }.join(&quot;,\n&quot;)}
+431:           )&quot;</span>
+432:         <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+      <div id="method-M000021" class="method-detail">
+        <a name="M000021"></a>
+
+        <div class="method-heading">
+          <a href="#M000021" class="method-signature">
+          <span class="method-name">trigger_name</span><span class="method-args">(table, events=[], options={})</span>
+          </a>
+        </div>
+      
+        <div class="method-description">
+          <p><a class="source-toggle" href="#"
+            onclick="toggleCode('M000021-source');return false;">[Source]</a></p>
+          <div class="method-source-code" id="M000021-source">
+<pre>
+     <span class="ruby-comment cmt"># File lib/rails_pg_procs.rb, line 354</span>
+354:         <span class="ruby-keyword kw">def</span> <span class="ruby-identifier">trigger_name</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>=[], <span class="ruby-identifier">options</span>={})
+355:           <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:name</span>] <span class="ruby-operator">||</span> <span class="ruby-constant">Inflector</span>.<span class="ruby-identifier">triggerize</span>(<span class="ruby-identifier">table</span>, <span class="ruby-identifier">events</span>, <span class="ruby-identifier">options</span>[<span class="ruby-identifier">:before</span>])
+356:         <span class="ruby-keyword kw">end</span>
+</pre>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

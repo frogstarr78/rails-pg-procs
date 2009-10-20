@@ -1,0 +1,15 @@
+RailsPgProcs
+=============
+
+Author           Scott Noel-Hemming
+Copyright        2008 QualitySmith, Inc.
+License          MIT License - http://www.opensource.org/licenses/mit-license.php
+
+
+Description goes here
+This is a rails plugin intended to implement PostgreSQL's
+stored procedures and trigger functions.  It is intended to 
+be used in rails migrations and in db schema files. 
+
+It was written to test a ror re-implementation to an existing 
+legacy schema.
