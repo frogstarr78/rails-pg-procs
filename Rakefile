@@ -5,8 +5,8 @@ begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
     gem.name = "rails-pg-procs"
-    gem.summary = %Q{TODO: one-line summary of your gem}
-    gem.description = %Q{TODO: longer description of your gem}
+    gem.summary = %Q{PostgreSQL Stored Proc/Trigger/View/User defined Type/Aggregate Type for Ruby Schema dump in Rails}
+    gem.description = %Q{Needed to support Database Stored procedures in a Rails app. Thus this was born.}
     gem.email = "frogstarr78@gmail.com"
     gem.homepage = "http://github.com/frogstarr78/rails-pg-procs"
     gem.authors = ["Scott Noel-Hemming"]
