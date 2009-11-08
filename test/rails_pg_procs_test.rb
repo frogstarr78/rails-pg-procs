@@ -1,5 +1,4 @@
 require 'test/unit'
-require 'test_extensions'
 require 'stringio'
 require 'runit/assert'
 require "#{File.dirname(__FILE__)}/../lib/rails_pg_procs"
