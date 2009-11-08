@@ -23,7 +23,7 @@ module ActiveRecord
             get_type(type)
           when String
             return %("#{types}") if types =~ /[\s\(]/
-            Inflector.symbolize(types)
+            ActiveSupport::Inflector.symbolize(types)
         end
       end
 
@@ -43,7 +43,7 @@ module ActiveRecord
           stream.print ", :strict => true" if is_strict
           stream.print ", :behavior => '#{behavior(volatile)}'" unless volatile == 'v'
           stream.print ", :lang => '#{lang}')"
-          stream.print " {\n    <<-#{Inflector.underscore(name)}_sql\n#{src.chomp}\n    #{Inflector.underscore(name)}_sql\n  }" if bin == '-'
+          stream.print " {\n    <<-#{ActiveSupport::Inflector.underscore(name)}_sql\n#{src.chomp}\n    #{ActiveSupport::Inflector.underscore(name)}_sql\n  }" if bin == '-'
           stream.print "\n"
         }
       end
@@ -67,7 +67,7 @@ module ActiveRecord
       def types(stream)
         @connection.types.each {|type|
           stream.print "  create_type #{type.name.to_sql_name}, "
-          stream.puts "#{ type.columns.collect{|column, type| "[#{Inflector.symbolize(column)}, #{get_type(type)}]"}.join(", ") }"
+          stream.puts "#{ type.columns.collect{|column, type| "[#{ActiveSupport::Inflector.symbolize(column)}, #{get_type(type)}]"}.join(", ") }"
         }
       end
 

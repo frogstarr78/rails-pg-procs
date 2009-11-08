@@ -24,8 +24,8 @@ module ActiveRecord
         ", [" + events.join(", ") + "]" <<
         (      before? ? ", :before => true"  : "") <<
         (         row? ? ", :row => true"     : "") <<
-        (!triggerized? ? ", :name => #{Inflector.symbolize(name)}" : "") <<
-        (!triggerized?(procedure_name) ? ", :function => #{Inflector.symbolize(procedure_name)}" : "")
+        (!triggerized? ? ", :name => #{ActiveSupport::Inflector.symbolize(name)}" : "") <<
+        (!triggerized?(procedure_name) ? ", :function => #{ActiveSupport::Inflector.symbolize(procedure_name)}" : "")
       end
 
       def binary_type=(*types)
@@ -75,7 +75,7 @@ module ActiveRecord
       private
 
       def triggerized_name
-        Inflector.triggerize(table, events, calc(BEFORE))
+        ActiveSupport::Inflector.triggerize(table, events, calc(BEFORE))
       end
 
       def events

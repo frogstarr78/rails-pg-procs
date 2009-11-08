@@ -200,7 +200,7 @@ module ActiveRecord
 #          user = INVOKER
         def delim(name, options)
           name = name.split('.').last if name.is_a?(String) && name.include?('.')
-          options[:delim] || "$#{Inflector.underscore(name)}_body$"
+          options[:delim] || "$#{ActiveSupport::Inflector.underscore(name)}_body$"
         end
           
 #       From PostgreSQL

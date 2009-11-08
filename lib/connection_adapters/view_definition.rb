@@ -11,7 +11,7 @@ module ActiveRecord
       end
 
       def to_rdl
-        "  create_view(#{Inflector.symbolize(name)}) { $#{name}_body$\n    #{view_body.call}\n  $#{name}_body$ }"
+        "  create_view(#{ActiveSupport::Inflector.symbolize(name)}) { $#{name}_body$\n    #{view_body.call}\n  $#{name}_body$ }"
 			end
 
 #     CREATE [ OR REPLACE ] [ TEMP | TEMPORARY ] VIEW NAME [ ( column_name [, ...] ) ]
