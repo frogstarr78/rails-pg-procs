@@ -101,130 +101,131 @@ END;" }
     @connection.drop_proc(:f_commacat, [:text, :text])
   end
 
-  # def test_methods
-  #   %w(procs types views schemas).each {|meth|
-  #     %w(create drop).each {|action| 
-  #       assert_respond_to "#{action}_#{meth.singularize}", @connection
-  #     }
-  #     assert_respond_to meth, @connection unless meth == 'procs'
-  #   }
-  #   %w(procedures triggers add_trigger remove_trigger).each {|meth|
-  #     assert_respond_to meth, @connection
-  #   }
-  # 
-  #   assert !@connection.procedures().nil?, "@connection#procedures returns nil"
-  #   procedures_count = @connection.procedures.size
-  #   trigger_count = @connection.triggers(:test_table).size
-  #   with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
-  #     assert_equal 0, trigger_count
-  #     assert_equal procedures_count + 1, @connection.procedures.size
-  #     with_trigger(:test_table, [:insert], :row => true) {
-  #       assert !@connection.triggers(:test_table).nil?, "Triggers for table :test_table returns nil"
-  #       received = @connection.triggers(:test_table)
-  #       assert_equal trigger_count + 1, received.size
-  #       assert_equal "insert_after_test_table_trigger", received.last.name
-  #     }
-  #   }
-  #   assert_equal procedures_count, @connection.procedures.size
-  # end
-  # 
-  # def test_more_complicated_schema_dumper
-  #   with_proc(:levenshtein, [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch'], :strict => true, :behavior => 'immutable', :lang => "C") {
-  #     assert_no_exception(NoMethodError) do 
-  #       dumper = ActiveRecord::SchemaDumper.new(@connection)
-  #       stream = StringIO.new
-  #       dumper.send(:procedures, stream)
-  #       stream.rewind
-  #       received = stream.read
-  #       assert_equal "  create_proc(\"levenshtein\", [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch', 'levenshtein'], :strict => true, :behavior => 'immutable', :lang => 'c')", received.split("\n")[-1]
-  #     end
-  #   }
-  # end
+  def test_methods
+    %w(procs types views schemas).each {|meth|
+      %w(create drop).each {|action| 
+        assert_respond_to "#{action}_#{meth.singularize}", @connection
+      }
+      assert_respond_to meth, @connection unless meth == 'procs'
+    }
+    %w(procedures triggers add_trigger remove_trigger).each {|meth|
+      assert_respond_to meth, @connection
+    }
+  
+    assert !@connection.procedures().nil?, "@connection#procedures returns nil"
+    procedures_count = @connection.procedures.size
+    trigger_count = @connection.triggers(:test_table).size
+    with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
+      assert_equal 0, trigger_count
+      assert_equal procedures_count + 1, @connection.procedures.size
+      with_trigger(:test_table, [:insert], :row => true) {
+        assert !@connection.triggers(:test_table).nil?, "Triggers for table :test_table returns nil"
+        received = @connection.triggers(:test_table)
+        assert_equal trigger_count + 1, received.size
+        assert_equal "insert_after_test_table_trigger", received.last.name
+      }
+    }
+    assert_equal procedures_count, @connection.procedures.size
+  end
+  
+  def test_more_complicated_schema_dumper
+    with_proc(:levenshtein, [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch'], :strict => true, :behavior => 'immutable', :lang => "C") {
+      assert_no_exception(NoMethodError) do 
+        dumper = ActiveRecord::SchemaDumper.new(@connection)
+        stream = StringIO.new
+        dumper.send(:procedures, stream)
+        stream.rewind
+        received = stream.read
+        assert_equal "  create_proc \"levenshtein\", [:text, :text], :return => nil, :resource => ['$libdir/fuzzystrmatch', 'levenshtein'], :strict => true, :behavior => 'immutable', :lang => 'c'", received.split("\n")[-1]
+      end
+    }
+  end
 
-  # def test_schema_definition_class
-  #   schema = ActiveRecord::ConnectionAdapters::SchemaDefinition.new('rails', 'postgres')
-  #   assert_match(/CREATE SCHEMA "rails" AUTHORIZATION "postgres"/, schema.to_sql)
-  #   assert_equal('DROP SCHEMA "rails" RESTRICT', schema.to_sql(:drop))
-  #   assert_match(/create_schema\ "rails", "postgres"$/, schema.to_rdl)
-  # 
-  #   count_query = "SELECT count(*) FROM pg_namespace WHERE nspname = 'rails'"
-  #   assert_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
-  #   assert_nothing_raised {
-  #     @connection.create_schema "rails"
-  #   }
-  #   # assert_equal 'rails,"$user",public', @connection.schema_search_path
-  #   assert_equal('"$user",public,rails', @connection.schema_search_path)
-  #   assert_not_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
-  #   assert_nothing_raised {
-  #     @connection.drop_schema "rails"
-  #   }
-  #   assert_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
-  # end
+  def test_schema_definition_class
+    schema = ActiveRecord::ConnectionAdapters::SchemaDefinition.new('rails', 'postgres')
+    assert_match(/CREATE SCHEMA "rails" AUTHORIZATION "postgres"/, schema.to_sql)
+    assert_equal('DROP SCHEMA "rails" RESTRICT', schema.to_sql(:drop))
+    assert_match(/create_schema\ "rails", "postgres"$/, schema.to_rdl)
+  
+    count_query = "SELECT count(*) FROM pg_namespace WHERE nspname = 'rails'"
+    assert_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
+    assert_nothing_raised {
+      @connection.create_schema "rails"
+    }
+    # assert_equal 'rails,"$user",public', @connection.schema_search_path
+    assert_equal('"$user",public,rails', @connection.schema_search_path)
+    assert_not_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
+    assert_nothing_raised {
+      @connection.drop_schema "rails"
+    }
+    assert_nil @connection.schemas.find {|schema| schema.name.to_s == 'rails' }
+  end
 
-  # def test_schema_dumper_schema
-  #   @connection.create_schema "rails"
-  #   assert_no_exception(NoMethodError) do 
-  #     dumper = ActiveRecord::SchemaDumper.new(@connection)
-  #     stream = StringIO.new
-  #     dumper.send(:schemas, stream)
-  #     stream.rewind
-  #     assert_match /create_schema\ "rails", "postgres"$/, stream.read.chomp 
-  #   end
-  #   @connection.drop_schema("rails", :cascade => true)
-  # end
+  def test_schema_dumper_schema
+    @connection.create_schema "rails"
+    assert_no_exception(NoMethodError) do 
+      dumper = ActiveRecord::SchemaDumper.new(@connection)
+      stream = StringIO.new
+      dumper.send(:schemas, stream)
+      stream.rewind
+      assert_match /create_schema\ "rails", "postgres"$/, stream.read.chomp 
+    end
+    @connection.drop_schema("rails", :cascade => true)
+  end
 
-  # def test_schema_dumper_exceptions
-  #   proc_name, columns = "test_sql_type_proc_with_table_reference", [:integer]
-  #   assert_equal [], @connection.procedures
-  #   assert_raise ActiveRecord::StatementInvalid do
-  #     @connection.create_proc(proc_name, columns, :return => nil, :lang => :sql) { 
-  #       <<-sql
-  #         SELECT * FROM a_table_that_doesnt_yet_exist WHERE id = '$1';
-  #       sql
-  #     }
-  #   end
-  #   assert_equal [], @connection.procedures
-  #   @connection.create_table(:a_table_that_doesnt_yet_exist, :force => true) { |t|
-  #     t.column :name, :varchar
-  #   }
-  # 
-  #   assert_equal [], @connection.procedures
-  #   assert_nothing_raised do
-  #     @connection.create_proc(proc_name, columns, :return => :integer, :lang => :sql, :force => true) { 
-  #       <<-sql
-  #         SELECT id FROM a_table_that_doesnt_yet_exist WHERE id = $1;
-  #       sql
-  #     }
-  #   end
-  #   @connection.drop_table(:a_table_that_doesnt_yet_exist)
-  #   @connection.drop_proc(proc_name, columns)
-  #   assert_equal [], @connection.procedures
-  # end
+  def test_schema_dumper_exceptions
+    proc_name, columns = "test_sql_type_proc_with_table_reference", [:integer]
+    assert_equal [], @connection.procedures
+    assert_raise ActiveRecord::StatementInvalid do
+      @connection.create_proc(proc_name, columns, :return => nil, :lang => :sql) { 
+        <<-sql
+          SELECT * FROM a_table_that_doesnt_yet_exist WHERE id = '$1';
+        sql
+      }
+    end
+    assert_equal [], @connection.procedures
+    @connection.create_table(:a_table_that_doesnt_yet_exist, :force => true) { |t|
+      t.column :name, :varchar
+    }
+  
+    assert_equal [], @connection.procedures
+    assert_nothing_raised do
+      @connection.create_proc(proc_name, columns, :return => :integer, :lang => :sql, :force => true) { 
+        <<-sql
+          SELECT id FROM a_table_that_doesnt_yet_exist WHERE id = $1;
+        sql
+      }
+    end
+    @connection.drop_table(:a_table_that_doesnt_yet_exist)
+    @connection.drop_proc(proc_name, columns)
+    assert_equal [], @connection.procedures
+  end
 
-  # def test_simple_schema_dumper
-  #   with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
-  #     with_trigger(:test_table, [:insert], :row => true) {
-  #       assert_no_exception(NoMethodError) do 
-  #         stream = StringIO.new
-  #         dumper = ActiveRecord::SchemaDumper.new(@connection)
-  #         dumper.send(:triggers, :test_table, stream)
-  #         stream.rewind
-  #         assert_match %q|add_trigger "test_table", [:insert], :row => true|.to_regex, stream.read
-  # 
-  #         stream = StringIO.new
-  #         dumper.send(:procedures, stream)
-  #         stream.rewind
-  #         assert_match %Q|create_proc(\"insert_after_test_table_trigger\", [], :return => :trigger, :lang => 'plpgsql') {\n    <<-insert_after_test_table_trigger_sql\n\n#{@query_body}\n    insert_after_test_table_trigger_sql\n  }\n|.to_regex, stream.read
-  #       end
-  #     }
-  #   }
-  # end
+  def test_simple_schema_dumper
+    with_proc(:insert_after_test_table_trigger, [], :return => :trigger) {
+      with_trigger(:test_table, [:insert], :row => true) {
+        assert_no_exception(NoMethodError) do 
+          stream = StringIO.new
+          dumper = ActiveRecord::SchemaDumper.new(@connection)
+          dumper.send(:triggers, :test_table, stream)
+          stream.rewind
+          assert_match %q|add_trigger "test_table", [:insert], :row => true|.to_regex, stream.read
+  
+          stream = StringIO.new
+          dumper.send(:procedures, stream)
+          stream.rewind
+          assert_match %Q|create_proc \"insert_after_test_table_trigger\", [], :return => :trigger, :resource => ['', '\nBEGIN\n-- do something --\nEND;\n\n'], :lang => 'plpgsql'|.to_regex, stream.read
+          
+        end
+      }
+    }
+  end
 
-  # def test_sym_to_str
-  #   assert_equal '"abc"', "abc".to_sql_name
-  #   assert_equal '"abc"', "abc".to_sym.to_sql_name
-  #   assert_equal "'abc'", "abc".to_sym.to_sql_value
-  # end
+  def test_sym_to_str
+    assert_equal '"abc"', "abc".to_sql_name
+    assert_equal '"abc"', "abc".to_sym.to_sql_name
+    assert_equal "'abc'", "abc".to_sym.to_sql_value
+  end
 
   private
     def with_proc(name, columns=[], options={}, &block)
