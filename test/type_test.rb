@@ -39,7 +39,10 @@ class TypeTest < Test::Unit::TestCase
       dumper.send(:types, stream)
       stream.rewind
       received = stream.read
-       assert_match %q|create_type "qualitysmith_user", [:name, "character varying(10)"], [:zip, "numeric(5,0)"], [:is_customer, :boolean]|.to_regex, received.chomp
+      ['[:name, "character varying(10)"]', '[:zip, "numeric(5,0)"]', '[:is_customer, :boolean]'].each do |fragment|
+        assert received.chomp[%r|create_type "qualitysmith_user",(.*)|, 1].include?(fragment)
+      end
+       
     end
     @connection.drop_type(:qualitysmith_user)
   end

@@ -37,12 +37,12 @@ module ActiveRecord
           arg_names ||= ''
           args      = get_type(arg_types.split(" "))#.zip(arg_names.split(" "))
 
-          stream.print "  create_proc(#{name.to_sql_name}, [#{args}], :return => #{get_type(ret_type)}"
+          stream.print "  create_proc #{name.to_sql_name}, [#{args}], :return => #{get_type(ret_type)}"
           stream.print ", :resource => ['#{bin}', '#{src}']" unless bin == '-'
           stream.print ", :set => true" if ret_set
           stream.print ", :strict => true" if is_strict
           stream.print ", :behavior => '#{behavior(volatile)}'" unless volatile == 'v'
-          stream.print ", :lang => '#{lang}')"
+          stream.print ", :lang => '#{lang}'"
           stream.print " {\n    <<-#{ActiveSupport::Inflector.underscore(name)}_sql\n#{src.chomp}\n    #{ActiveSupport::Inflector.underscore(name)}_sql\n  }" if bin == '-'
           stream.print "\n"
         }

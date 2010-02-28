@@ -4,7 +4,7 @@ require 'runit/assert'
 require 'test/unit'
 
 $LOAD_PATH.unshift(File.dirname(__FILE__))
-$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..'))
 require 'rails_pg_procs'
 require 'connection'
 
@@ -22,11 +22,11 @@ class Test::Unit::TestCase
       t.timestamp :when
     }
 
-    @query_body = "
-  BEGIN
-        -- do something --
-  END;
-"
+    @query_body = <<-QUERY
+BEGIN
+-- do something --
+END;
+QUERY
   end
 
   def teardown
